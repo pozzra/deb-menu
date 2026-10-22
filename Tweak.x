@@ -50,7 +50,85 @@ static NSString *RAACHEATCatalogPath(void) {
     return path ? path : @"/Library/Application Support/RAACHEATMenuDebug/index.html";
 }
 
+static NSArray<NSString *> *RXAACatalogCategories(void) {
+    return @[@"aimbot", @"visuals", @"memory", @"settings", @"help"];
+}
+
+static NSArray<NSDictionary *> *RXAACatalogFeatures(void) {
+    static NSArray<NSDictionary *> *features = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSString *path = RAACHEATResourcePath(@"menu_catalog.json");
+        NSData *data = path ? [NSData dataWithContentsOfFile:path] : nil;
+        id root = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+        NSArray *items = nil;
+        if ([root isKindOfClass:[NSDictionary class]]) {
+            id value = ((NSDictionary *)root)[@"items"];
+            if ([value isKindOfClass:[NSArray class]]) {
+                items = (NSArray *)value;
+            }
+        }
+
+        NSSet<NSString *> *wanted = [NSSet setWithArray:RXAACatalogCategories()];
+        NSMutableArray<NSDictionary *> *result = [NSMutableArray array];
+        for (id item in items) {
+            if (![item isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            NSDictionary *entry = (NSDictionary *)item;
+            NSString *category = entry[@"category"];
+            NSString *label = entry[@"label"];
+            if (![category isKindOfClass:[NSString class]] ||
+                ![label isKindOfClass:[NSString class]] ||
+                ![wanted containsObject:category]) {
+                continue;
+            }
+            [result addObject:entry];
+        }
+        features = [result copy];
+    });
+    return features ? features : @[];
+}
+
+static NSArray<NSDictionary *> *RXAACatalogFeaturesForCategory(NSString *category) {
+    NSMutableArray<NSDictionary *> *result = [NSMutableArray array];
+    for (NSDictionary *item in RXAACatalogFeatures()) {
+        if ([item[@"category"] isEqualToString:category]) {
+            [result addObject:item];
+        }
+    }
+    return result;
+}
+
+static NSString *RXAACatalogFeatureKey(NSDictionary *item) {
+    NSString *category = item[@"category"];
+    NSString *label = item[@"label"];
+    if (!category) {
+        category = @"feature";
+    }
+    if (!label) {
+        label = @"unknown";
+    }
+    return [NSString stringWithFormat:@"rxaa.catalog.%@.%@", category, label];
+}
+
+static BOOL RXAACatalogFeatureIsActionable(NSDictionary *item) {
+    NSString *kind = item[@"kind"];
+    return [kind isEqualToString:@"toggle"] ||
+           [kind isEqualToString:@"slider"] ||
+           [kind isEqualToString:@"combo"] ||
+           [kind isEqualToString:@"config-key"];
+}
+
 @interface RXAAMenuViewController : UITableViewController
+@end
+
+@interface RXAACatalogFeatureViewController : UITableViewController
+- (void)catalogSwitchChanged:(UISwitch *)sender;
+@end
+
+@interface RXAACatalogSwitch : UISwitch
+@property (nonatomic, copy) NSString *featureKey;
 @end
 
 @interface RXAACatalogViewController : UIViewController
@@ -227,7 +305,7 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     if (section == 0) {
         return (NSInteger)[RXAAFeatureTitles() count];
     }
-    return 3;
+    return 4;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
@@ -238,7 +316,7 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     if (section == 0) {
         return @"UI-only demo switches. They save ON/OFF locally and do not hook or modify any game.";
     }
-    return @"Get Code opens the offline catalog. Apply All / Reset All only change the demo switch states.";
+    return @"Get Code opens the offline catalog. All Features lists the catalog entries. Apply All / Reset All only change demo switch states.";
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -275,6 +353,11 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
             cell.detailTextLabel.text = @"Browse menu names, addresses and ARM64 xrefs";
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         } else if (indexPath.row == 1) {
+            cell.textLabel.text = [NSString stringWithFormat:@"All Features (%lu)",
+                                   (unsigned long)[RXAACatalogFeatures() count]];
+            cell.detailTextLabel.text = @"Browse every catalog feature entry";
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        } else if (indexPath.row == 2) {
             cell.textLabel.text = @"Apply All (Demo)";
             cell.detailTextLabel.text = @"Turn all demo switches ON";
             cell.accessoryType = UITableViewCellAccessoryNone;
@@ -302,8 +385,14 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
 }
 
 - (void)setAllDemoSwitches:(BOOL)on {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     for (NSString *key in RXAAFeatureKeys()) {
-        [[NSUserDefaults standardUserDefaults] setBool:on forKey:key];
+        [defaults setBool:on forKey:key];
+    }
+    for (NSDictionary *item in RXAACatalogFeatures()) {
+        if (RXAACatalogFeatureIsActionable(item)) {
+            [defaults setBool:on forKey:RXAACatalogFeatureKey(item)];
+        }
     }
     [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:0]
                   withRowAnimation:UITableViewRowAnimationNone];
@@ -315,10 +404,118 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
         if (indexPath.row == 0) {
             RXAACatalogViewController *catalog = [[RXAACatalogViewController alloc] init];
             [self.navigationController pushViewController:catalog animated:YES];
+        } else if (indexPath.row == 1) {
+            RXAACatalogFeatureViewController *features = [[RXAACatalogFeatureViewController alloc] init];
+            [self.navigationController pushViewController:features animated:YES];
         } else {
-            [self setAllDemoSwitches:(indexPath.row == 1)];
+            [self setAllDemoSwitches:(indexPath.row == 2)];
         }
     }
+}
+
+- (UIStatusBarStyle)preferredStatusBarStyle {
+    return UIStatusBarStyleLightContent;
+}
+
+@end
+
+@implementation RXAACatalogSwitch
+@end
+
+@implementation RXAACatalogFeatureViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.title = @"All Features";
+    self.tableView.backgroundColor = RXAABackground();
+    self.tableView.separatorColor = [UIColor colorWithWhite:0.18 alpha:1.0];
+    self.tableView.tableFooterView = [[UIView alloc] init];
+    self.tableView.rowHeight = 58.0;
+}
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    return (NSInteger)[RXAACatalogCategories() count];
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    NSArray<NSString *> *categories = RXAACatalogCategories();
+    if (section < 0 || section >= (NSInteger)categories.count) {
+        return 0;
+    }
+    return (NSInteger)[RXAACatalogFeaturesForCategory(categories[(NSUInteger)section]) count];
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+    NSArray<NSString *> *categories = RXAACatalogCategories();
+    if (section < 0 || section >= (NSInteger)categories.count) {
+        return nil;
+    }
+    return [categories[(NSUInteger)section] uppercaseString];
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    if (section == 0) {
+        return @"UI-only demo entries. Switches save locally; no game hooks or memory access.";
+    }
+    return nil;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    static NSString *cellID = @"RXAACatalogFeatureCell";
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellID];
+    if (!cell) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:cellID];
+        cell.backgroundColor = [UIColor colorWithRed:0.07 green:0.10 blue:0.14 alpha:1.0];
+        cell.textLabel.textColor = [UIColor whiteColor];
+        cell.detailTextLabel.textColor = [UIColor colorWithWhite:0.62 alpha:1.0];
+        cell.textLabel.adjustsFontSizeToFitWidth = YES;
+        cell.textLabel.minimumScaleFactor = 0.72;
+    }
+
+    NSArray<NSString *> *categories = RXAACatalogCategories();
+    if (indexPath.section < 0 || indexPath.section >= (NSInteger)categories.count) {
+        return cell;
+    }
+    NSArray<NSDictionary *> *features = RXAACatalogFeaturesForCategory(categories[(NSUInteger)indexPath.section]);
+    if (indexPath.row < 0 || indexPath.row >= (NSInteger)features.count) {
+        return cell;
+    }
+    NSDictionary *item = features[(NSUInteger)indexPath.row];
+
+    NSString *label = item[@"label"];
+    NSString *category = item[@"category"];
+    NSString *kind = item[@"kind"];
+    cell.textLabel.text = label ? label : @"(unnamed)";
+    category = category ? category : @"feature";
+    kind = kind ? kind : @"entry";
+    cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ - %@ - UI demo", category, kind];
+    cell.accessoryType = UITableViewCellAccessoryNone;
+    cell.accessoryView = nil;
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+    if (RXAACatalogFeatureIsActionable(item)) {
+        RXAACatalogSwitch *sw = [[RXAACatalogSwitch alloc] init];
+        sw.featureKey = RXAACatalogFeatureKey(item);
+        sw.onTintColor = RXAAGreen();
+        sw.on = [[NSUserDefaults standardUserDefaults] boolForKey:sw.featureKey];
+        sw.accessibilityLabel = item[@"label"];
+        [sw addTarget:self action:@selector(catalogSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = sw;
+    } else {
+        cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ - %@ - catalog entry", category, kind];
+    }
+    return cell;
+}
+
+- (void)catalogSwitchChanged:(UISwitch *)sender {
+    if (![sender isKindOfClass:[RXAACatalogSwitch class]]) {
+        return;
+    }
+    RXAACatalogSwitch *sw = (RXAACatalogSwitch *)sender;
+    if (!sw.featureKey) {
+        return;
+    }
+    [[NSUserDefaults standardUserDefaults] setBool:sw.isOn forKey:sw.featureKey];
 }
 
 - (UIStatusBarStyle)preferredStatusBarStyle {

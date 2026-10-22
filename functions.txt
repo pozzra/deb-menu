@@ -1,7 +1,7 @@
 RXAA iOS MENU - FUNCTION REFERENCE
 ==================================
 Generated: 2026-10-23
-Updated:   2026-10-23 for Rxaa 1.1.1
+Updated:   2026-10-23 for Rxaa 1.2.0
 Project:   C:\Users\PC\Desktop\Roses-Mod-Menu-master\RAACHEAT_iOS_Menu_Debug
 Primary:   Tweak.x
 Web app:   layout\Library\Application Support\RAACHEATMenuDebug\index.html
@@ -16,8 +16,8 @@ and its embedded HTML/JavaScript catalog.
 
 It does NOT document the thousands of internal functions in libRAACHEAT.so.
 That is separate native reverse-engineering work. This is the UI/build layer:
-the floating icon, the native Rxaa list, the ON/OFF switches, the Get Code catalog
-WebView, and the retry/install flow.
+the floating icon, the native Rxaa list, the All Features browser, the ON/OFF
+switches, the Get Code catalog WebView, and the retry/install flow.
 
 SAFETY NOTE
 -----------
@@ -42,7 +42,7 @@ RAACHEATMenuDebug.plist
 control
   Package: com.rxaa.menudebug
   Name: Rxaa
-  Version: 1.1.1
+  Version: 1.2.0
 
 GLOBAL STATE (Tweak.x)
 ----------------------
@@ -498,7 +498,7 @@ PART 1 - TWEAK.X FUNCTIONS
 
     Sections
       0 = FEATURES (AimLock/ESP/Radar switches)
-      1 = TOOLS (Get Code, Apply All, Reset All)
+      1 = TOOLS (Get Code, All Features, Apply All, Reset All)
 
 15. RXAAMenuViewController -tableView:numberOfRowsInSection:
     Signature: - (NSInteger)tableView:(UITableView *)tableView
@@ -515,7 +515,7 @@ PART 1 - TWEAK.X FUNCTIONS
 
     Returns
       Section 0: RXAAFeatureTitles().count, currently 3.
-      Section 1: 3 (Get Code, Apply All, Reset All).
+      Section 1: 4 (Get Code, All Features, Apply All, Reset All).
 
     Behavior
       Uses the titles array as the source of truth for the feature count.
@@ -554,8 +554,8 @@ PART 1 - TWEAK.X FUNCTIONS
         "UI-only demo switches. They save ON/OFF locally and do not hook or
          modify any game."
       Section 1:
-        "Get Code opens the offline catalog. Apply All / Reset All only change
-         the demo switch states."
+        "Get Code opens the offline catalog. All Features lists the catalog
+         entries. Apply All / Reset All only change demo switch states."
 
 18. RXAAMenuViewController -tableView:cellForRowAtIndexPath:
     Signature: - (UITableViewCell *)tableView:(UITableView *)tableView
@@ -586,11 +586,14 @@ PART 1 - TWEAK.X FUNCTIONS
     Section 1 behavior
       - Row 0: title "Get Code", subtitle "Browse menu names, addresses and
         ARM64 xrefs", disclosure indicator.
-      - Row 1: title "Apply All (Demo)", subtitle "Turn all demo switches ON",
+      - Row 1: dynamic title "All Features (N)" where N is the number of
+        catalog feature entries (currently 108); subtitle "Browse every catalog
+        feature entry"; disclosure indicator.
+      - Row 2: title "Apply All (Demo)", subtitle "Turn all demo switches ON",
         no accessory.
-      - Row 2: title "Reset All (Demo)", subtitle "Turn all demo switches OFF",
+      - Row 3: title "Reset All (Demo)", subtitle "Turn all demo switches OFF",
         no accessory.
-      - All three rows are selectable.
+      - All four rows are selectable.
 
     Side effects
       Creates a new UISwitch each time a feature cell is configured.
@@ -626,7 +629,7 @@ PART 1 - TWEAK.X FUNCTIONS
     Class:    RXAAMenuViewController
 
     Purpose
-      Handle the Get Code, Apply All, and Reset All rows.
+      Handle the Get Code, All Features, Apply All, and Reset All rows.
 
     Parameters
       tableView - the Rxaa table.
@@ -639,8 +642,10 @@ PART 1 - TWEAK.X FUNCTIONS
       - Deselects the row.
       - If section 1 row 0 was selected, creates RXAACatalogViewController and
         pushes it onto the navigation stack.
-      - If section 1 row 1 was selected, calls -setAllDemoSwitches:YES.
-      - If section 1 row 2 was selected, calls -setAllDemoSwitches:NO.
+      - If section 1 row 1 was selected, creates
+        RXAACatalogFeatureViewController and pushes it.
+      - If section 1 row 2 was selected, calls -setAllDemoSwitches:YES.
+      - If section 1 row 3 was selected, calls -setAllDemoSwitches:NO.
 
     Side effects
       Navigation push or demo NSUserDefaults writes.
@@ -651,7 +656,8 @@ PART 1 - TWEAK.X FUNCTIONS
     Class:    RXAAMenuViewController
 
     Purpose
-      Turn all three demo switches ON or OFF at once.
+      Turn all demo switches ON or OFF at once, including actionable catalog
+      entries.
 
     Parameters
       on - YES for Apply All, NO for Reset All.
@@ -660,10 +666,11 @@ PART 1 - TWEAK.X FUNCTIONS
       void.
 
     Behavior
-      - Iterates RXAAFeatureKeys().
-      - Writes the same boolean to NSUserDefaults for every key.
-      - Reloads section 0 without animation so the switch states and ON/OFF
-        subtitles refresh.
+      - Iterates RXAAFeatureKeys() and writes the boolean.
+      - Iterates RXAACatalogFeatures(); for every actionable catalog entry,
+        writes the same boolean under RXAACatalogFeatureKey(item).
+      - Reloads main-menu section 0 without animation so the switch states and
+        ON/OFF subtitles refresh.
 
     Side effects
       NSUserDefaults writes and a table section reload. No game memory or
@@ -969,6 +976,237 @@ PART 1 - TWEAK.X FUNCTIONS
       window or calls RAACHEATTryInstall.
 
 
+PART 1B - CATALOG-DRIVEN FEATURE BROWSER
+========================================
+These functions/classes load menu_catalog.json and build the "All Features"
+screen. The JSON is read from the installed resource directory, filtered to the
+five feature categories, and displayed as grouped UI-only rows. No game process
+is contacted.
+
+1. RXAACatalogCategories
+   Signature: static NSArray<NSString *> *RXAACatalogCategories(void)
+   Location: Tweak.x
+
+   Purpose
+     Define the category order used by the All Features screen.
+
+   Returns
+     @[@"aimbot", @"visuals", @"memory", @"settings", @"help"].
+
+   Notes
+     These are the categories counted as feature_entries in build_info.json
+     (108 total).
+
+2. RXAACatalogFeatures
+   Signature: static NSArray<NSDictionary *> *RXAACatalogFeatures(void)
+   Location: Tweak.x
+
+   Purpose
+     Load and cache the feature entries from menu_catalog.json.
+
+   Behavior
+     - Finds menu_catalog.json through RAACHEATResourcePath.
+     - Reads it with NSData and NSJSONSerialization.
+     - Reads the top-level "items" array.
+     - Keeps dictionaries whose "category" is in RXAACatalogCategories.
+     - Requires string values for "category" and "label".
+     - Caches the filtered array with dispatch_once.
+
+   Returns
+     The cached feature array, or an empty array if the JSON is missing or
+     malformed.
+
+   Notes
+     The screen displays all 108 feature entries: 63 actionable entries
+     (config-key/toggle/slider/combo) and 45 read-only label/help entries.
+
+3. RXAACatalogFeaturesForCategory
+   Signature: static NSArray<NSDictionary *> *RXAACatalogFeaturesForCategory(NSString *category)
+   Location: Tweak.x
+
+   Purpose
+     Filter the cached feature list for one category.
+
+   Parameters
+     category - aimbot, visuals, memory, settings, or help.
+
+   Returns
+     A new array containing matching feature dictionaries, in catalog order.
+
+4. RXAACatalogFeatureKey
+   Signature: static NSString *RXAACatalogFeatureKey(NSDictionary *item)
+   Location: Tweak.x
+
+   Purpose
+     Build the NSUserDefaults key for one feature switch.
+
+   Parameters
+     item - one feature dictionary from menu_catalog.json.
+
+   Returns
+     "rxaa.catalog.<category>.<label>".
+
+   Notes
+     Labels are unique in the current 108-entry feature set, so this key is
+     stable for this catalog build.
+
+5. RXAACatalogFeatureIsActionable
+   Signature: static BOOL RXAACatalogFeatureIsActionable(NSDictionary *item)
+   Location: Tweak.x
+
+   Purpose
+     Decide whether a feature row gets a demo switch.
+
+   Parameters
+     item - one feature dictionary.
+
+   Returns
+     YES for kind toggle, slider, combo, or config-key; NO for label and help
+     entries.
+
+   Notes
+     This keeps headings/descriptions readable while exposing every actionable
+     catalog key as an ON/OFF demo switch.
+
+6. RXAACatalogSwitch
+   Signature: @interface RXAACatalogSwitch : UISwitch
+              @property (nonatomic, copy) NSString *featureKey;
+              @end
+   Location: Tweak.x
+
+   Purpose
+     A UISwitch that carries the NSUserDefaults key for its catalog row.
+
+   Behavior
+     - Inherits all UISwitch behavior.
+     - featureKey is set when the cell is configured.
+     - -catalogSwitchChanged: reads featureKey instead of relying on a row tag.
+
+7. RXAACatalogFeatureViewController -viewDidLoad
+   Signature: - (void)viewDidLoad
+   Location: Tweak.x
+   Class:    RXAACatalogFeatureViewController
+
+   Purpose
+     Configure the All Features table.
+
+   Behavior
+     - Sets the navigation title to "All Features".
+     - Sets the Rxaa background color.
+     - Sets a dark separator color.
+     - Clears the empty table footer and sets a 58-point row height.
+
+8. RXAACatalogFeatureViewController -numberOfSectionsInTableView:
+   Signature: - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
+   Location: Tweak.x
+   Class:    RXAACatalogFeatureViewController
+
+   Purpose
+     Return one section per feature category.
+
+   Returns
+     RXAACatalogCategories().count, currently 5.
+
+9. RXAACatalogFeatureViewController -tableView:numberOfRowsInSection:
+   Signature: - (NSInteger)tableView:(UITableView *)tableView
+                numberOfRowsInSection:(NSInteger)section
+   Location: Tweak.x
+   Class:    RXAACatalogFeatureViewController
+
+   Purpose
+     Return the number of feature entries in a category.
+
+   Parameters
+     tableView - the All Features table.
+     section   - 0..4.
+
+   Returns
+     RXAACatalogFeaturesForCategory(category).count, or 0 for an invalid
+     section.
+
+10. RXAACatalogFeatureViewController -tableView:titleForHeaderInSection:
+    Signature: - (NSString *)tableView:(UITableView *)tableView
+                 titleForHeaderInSection:(NSInteger)section
+    Location: Tweak.x
+    Class:    RXAACatalogFeatureViewController
+
+    Purpose
+      Show the uppercase category name as the section header.
+
+    Returns
+      AIMBOT, VISUALS, MEMORY, SETTINGS, or HELP; nil for an invalid section.
+
+11. RXAACatalogFeatureViewController -tableView:titleForFooterInSection:
+    Signature: - (NSString *)tableView:(UITableView *)tableView
+                 titleForFooterInSection:(NSInteger)section
+    Location: Tweak.x
+    Class:    RXAACatalogFeatureViewController
+
+    Purpose
+      Explain that the All Features switches are UI-only.
+
+    Returns
+      Section 0: "UI-only demo entries. Switches save locally; no game hooks
+      or memory access."
+      Other sections: nil.
+
+12. RXAACatalogFeatureViewController -tableView:cellForRowAtIndexPath:
+    Signature: - (UITableViewCell *)tableView:(UITableView *)tableView
+                 cellForRowAtIndexPath:(NSIndexPath *)indexPath
+    Location: Tweak.x
+    Class:    RXAACatalogFeatureViewController
+
+    Purpose
+      Build one feature row from menu_catalog.json.
+
+    Parameters
+      tableView - the All Features table.
+      indexPath - section/category and row.
+
+    Returns
+      A configured subtitle cell.
+
+    Behavior
+      - Looks up the category and feature dictionary.
+      - Sets the label as the title.
+      - Sets the subtitle to "<category> - <kind> - UI demo" or
+        "<category> - <kind> - catalog entry".
+      - For actionable entries, creates RXAACatalogSwitch, restores its saved
+        ON/OFF value, sets featureKey, and adds -catalogSwitchChanged:.
+      - For label/help entries, shows no switch and no selection.
+      - Adjusts long labels to fit the row width.
+
+13. RXAACatalogFeatureViewController -catalogSwitchChanged:
+    Signature: - (void)catalogSwitchChanged:(UISwitch *)sender
+    Location: Tweak.x
+    Class:    RXAACatalogFeatureViewController
+
+    Purpose
+      Save the demo state of one catalog feature switch.
+
+    Parameters
+      sender - the RXAACatalogSwitch that changed.
+
+    Behavior
+      - Verifies the sender is an RXAACatalogSwitch.
+      - Reads its featureKey.
+      - Writes sender.isOn to NSUserDefaults under that key.
+
+    Side effects
+      NSUserDefaults write only. No game memory or process access.
+
+14. RXAACatalogFeatureViewController -preferredStatusBarStyle
+    Signature: - (UIStatusBarStyle)preferredStatusBarStyle
+    Location: Tweak.x
+    Class:    RXAACatalogFeatureViewController
+
+    Purpose
+      Request a light status bar for the dark feature list.
+
+    Returns
+      UIStatusBarStyleLightContent.
+
+
 PART 2 - INDEX.HTML JAVASCRIPT FUNCTIONS
 ========================================
 The catalog is a self-contained page. MENU_DATA is embedded in the HTML.
@@ -1189,10 +1427,10 @@ build_deb.sh
 EXPECTED OUTPUT
 ---------------
 Rootful:
-  packages/com.rxaa.menudebug_1.1.1_iphoneos-arm.deb
+  packages/com.rxaa.menudebug_1.2.0_iphoneos-arm.deb
 
 Rootless:
-  packages/com.rxaa.menudebug_1.1.1_iphoneos-arm64.deb
+  packages/com.rxaa.menudebug_1.2.0_iphoneos-arm64.deb
   (actual name may vary with Theos packaging scheme)
 
 INSTALL TARGETS
