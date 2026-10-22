@@ -1,8 +1,8 @@
-Package: com.raacheat.menudebug
-Name: RAACHEAT Menu Code (Debug)
-Version: 1.0.0
+Package: com.rxaa.menudebug
+Name: Rxaa
+Version: 1.1.0
 Architecture: iphoneos-arm
-Description: UI-only offline catalog overlay for libRAACHEAT menu names and code. No game hooks.
+Description: Rxaa UI-only demo menu and offline code catalog. No game hooks or memory access.
 Maintainer: local
 Author: local
 Section: Utilities

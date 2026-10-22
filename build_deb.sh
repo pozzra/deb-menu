@@ -6,7 +6,7 @@ if [[ -z "${THEOS:-}" ]]; then
   exit 1
 fi
 
-if [[ ! -x "${THEOS}/bin/makefiles" && ! -d "${THEOS}/makefiles" ]]; then
+if [[ ! -d "${THEOS}/makefiles" ]]; then
   echo "Theos not found at: ${THEOS}" >&2
   exit 1
 fi
