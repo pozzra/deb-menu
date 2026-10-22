@@ -246,7 +246,9 @@ PART 1 - TWEAK.X FUNCTIONS
 
    Behavior
      1. Logs "[Rxaa] opening menu".
-     2. Saves the current app key window in gPreviousKeyWindow.
+     2. Saves the current app key window in gPreviousKeyWindow via
+        RAACHEATKeyWindowForScene(nil). If no key window is found, uses the
+        first non-overlay app window.
      3. Calls [gOverlayWindow makeKeyAndVisible] so presentation/touches work
         reliably while the menu is open.
      4. Creates RXAAMenuViewController with UITableViewStyleGrouped.
@@ -371,6 +373,27 @@ PART 1 - TWEAK.X FUNCTIONS
     Behavior
       If gPreviousKeyWindow exists and is not the overlay window, calls
       -makeKeyWindow on it. Then clears gPreviousKeyWindow.
+
+9c. RAACHEATKeyWindowForScene
+    Signature: static UIWindow *RAACHEATKeyWindowForScene(UIWindowScene *scene)
+    Location: Tweak.x
+
+    Purpose
+      Find the current key window without using the deprecated
+      UIApplication.keyWindow API, which is treated as an error by the build's
+      deprecation warnings.
+
+    Parameters
+      scene - the preferred UIWindowScene, or nil.
+
+    Returns
+      The first window whose isKeyWindow is YES; otherwise nil.
+
+    Behavior
+      - Checks scene.windows when a scene is provided.
+      - Checks all connected UIWindowScene objects.
+      - Falls back to UIApplication.windows for legacy/older layouts.
+      - The overlay window itself is filtered out by the caller when needed.
 
 10. RXAAFeatureTitles
     Signature: static NSArray<NSString *> *RXAAFeatureTitles(void)
@@ -868,8 +891,9 @@ PART 1 - TWEAK.X FUNCTIONS
       overlay window itself is skipped.
 
     Behavior
-      Checks app.keyWindow first, then scene.windows, then app.windows. This
-      prevents installing the gesture on the transparent overlay window.
+      Checks RAACHEATKeyWindowForScene first, then scene.windows, then
+      app.windows. This prevents installing the gesture on the transparent
+      overlay window.
 
 31. RAACHEATInstallOpenGesture
     Signature: static void RAACHEATInstallOpenGesture(RAACHEATRootController *root, UIWindowScene *scene)

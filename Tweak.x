@@ -62,6 +62,34 @@ static NSString *RAACHEATCatalogPath(void) {
 - (void)raacheatPan:(UIPanGestureRecognizer *)pan;
 @end
 
+static UIWindow *RAACHEATKeyWindowForScene(UIWindowScene *scene) {
+    if (@available(iOS 13.0, *)) {
+        if (scene) {
+            for (UIWindow *window in scene.windows) {
+                if (window.isKeyWindow) {
+                    return window;
+                }
+            }
+        }
+        for (UIScene *connected in [UIApplication sharedApplication].connectedScenes) {
+            if (![connected isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
+            for (UIWindow *window in ((UIWindowScene *)connected).windows) {
+                if (window.isKeyWindow) {
+                    return window;
+                }
+            }
+        }
+    }
+    for (UIWindow *window in [UIApplication sharedApplication].windows) {
+        if (window.isKeyWindow) {
+            return window;
+        }
+    }
+    return nil;
+}
+
 static void RAACHEATRestorePreviousKeyWindow(void) {
     if (gPreviousKeyWindow && gPreviousKeyWindow != gOverlayWindow) {
         [gPreviousKeyWindow makeKeyWindow];
@@ -95,7 +123,7 @@ static void RAACHEATOpenPanel(void) {
     }
 
     NSLog(@"[Rxaa] opening menu");
-    gPreviousKeyWindow = [UIApplication sharedApplication].keyWindow;
+    gPreviousKeyWindow = RAACHEATKeyWindowForScene(nil);
     if (gPreviousKeyWindow == gOverlayWindow) {
         gPreviousKeyWindow = nil;
     }
@@ -371,8 +399,9 @@ static UIWindowScene *RAACHEATActiveWindowScene(void) {
 
 static UIWindow *RAACHEATHostWindow(UIWindowScene *scene) {
     UIApplication *app = [UIApplication sharedApplication];
-    if (app.keyWindow && app.keyWindow != gOverlayWindow) {
-        return app.keyWindow;
+    UIWindow *keyWindow = RAACHEATKeyWindowForScene(scene);
+    if (keyWindow && keyWindow != gOverlayWindow) {
+        return keyWindow;
     }
     if (scene) {
         UIWindow *fallback = nil;
