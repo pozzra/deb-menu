@@ -22,8 +22,9 @@ switches, the Get Code catalog WebView, and the retry/install flow.
 SAFETY NOTE
 -----------
 Rxaa is UI-only. The AimLock/ESP/Radar switches save a boolean in
-NSUserDefaults and change a label. They do not hook a game, read/write game
-memory, or perform aimbot/ESP behavior.
+NSUserDefaults and change a label. The All Features switches do the same for
+catalog entries. They do not hook a game, read/write game memory, or perform
+aimbot/ESP behavior.
 
 FILES
 -----
