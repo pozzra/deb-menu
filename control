@@ -1,0 +1,9 @@
+Package: com.raacheat.menudebug
+Name: RAACHEAT Menu Code (Debug)
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: UI-only offline catalog overlay for libRAACHEAT menu names and code. No game hooks.
+Maintainer: local
+Author: local
+Section: Utilities
+Depends: mobilesubstrate | ellekit

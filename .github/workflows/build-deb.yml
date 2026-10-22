@@ -1,0 +1,46 @@
+name: Build iOS deb
+
+on:
+  workflow_dispatch:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: brew install ldid xz
+
+      - name: Install Theos
+        run: |
+          export THEOS="$HOME/theos"
+          git clone --recursive https://github.com/theos/theos.git "$THEOS"
+          mkdir -p "$THEOS/sdks"
+          git clone --depth 1 https://github.com/theos/sdks.git "$RUNNER_TEMP/theos-sdks"
+          cp -R "$RUNNER_TEMP/theos-sdks"/*.sdk "$THEOS/sdks/"
+          echo "THEOS=$THEOS" >> "$GITHUB_ENV"
+
+      - name: Build rootful package
+        run: |
+          make clean package FINALPACKAGE=1
+          mkdir -p out/rootful
+          mv packages/*.deb out/rootful/
+
+      - name: Build rootless package
+        run: |
+          make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mkdir -p out/rootless
+          mv packages/*.deb out/rootless/
+
+      - name: Upload debs
+        uses: actions/upload-artifact@v4
+        with:
+          name: RAACHEATMenuDebug-deb
+          path: out/**/*.deb
+          if-no-files-found: error

@@ -1,0 +1,24 @@
+{
+  "app": "RAACHEAT Menu Code - Debug Catalog",
+  "version": "1.0.0-debug",
+  "generated": "2026-10-23",
+  "source_apk": "ESP Cracked.apk",
+  "source_library": "lib/arm64-v8a/libRAACHEAT.so",
+  "library_sha256": "496CDCF1D3E8AF13A548B7BD7226D4A5963B3E44A95B65BB86E8060FD14A261D",
+  "entries": 189,
+  "feature_entries": 108,
+  "categories": {
+    "aimbot": 41,
+    "visuals": 48,
+    "memory": 6,
+    "settings": 9,
+    "help": 4,
+    "ui": 24,
+    "ui-id": 38,
+    "format": 7,
+    "runtime": 9,
+    "path": 3
+  },
+  "data_store": "menu_catalog.json",
+  "notes": "Static analysis only. This is a code browser, not a functional cheat build."
+}
