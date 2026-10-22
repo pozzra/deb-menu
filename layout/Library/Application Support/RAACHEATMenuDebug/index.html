@@ -183,7 +183,27 @@ const MENU_DATA = {"meta":{"library":"libRAACHEAT.so","sha256":"496CDCF1D3E8AF13
     const hay = [item.label,item.va,item.first_xref,item.kind,item.category,(item.xrefs||[]).join(" ")].join(" ").toLowerCase();
     return hay.includes(query);
   }
-  function copyCard(item, pre){
+  function copyText(text, done){
+    const fallback = ()=>{
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.style.top = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      done();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+  function copyCard(item, pre, ev){
     const m = item.meta || {};
     const text = [
       item.label,
@@ -197,8 +217,13 @@ const MENU_DATA = {"meta":{"library":"libRAACHEAT.so","sha256":"496CDCF1D3E8AF13
       "",
       pre.textContent
     ].filter(Boolean).join("\n");
-    navigator.clipboard && navigator.clipboard.writeText(text).then(()=>{
-      const b=event && event.target; if(b){ const old=b.textContent; b.textContent="copied"; setTimeout(()=>b.textContent=old,900); }
+    const b = ev && ev.currentTarget;
+    copyText(text, ()=>{
+      if (b) {
+        const old = b.textContent;
+        b.textContent = "copied";
+        setTimeout(()=>{ b.textContent = old; }, 900);
+      }
     });
   }
   function render(){
@@ -247,7 +272,7 @@ const MENU_DATA = {"meta":{"library":"libRAACHEAT.so","sha256":"496CDCF1D3E8AF13
       det.appendChild(sum);
       const pre = el("pre", null, (item.asm || []).join("\n"));
       det.appendChild(pre);
-      const btn = el("button","copy","copy");
+      const btn = el("button","copy","Get code");
       btn.type = "button";
       btn.addEventListener("click", (ev)=>copyCard(item,pre,ev));
       det.appendChild(btn);

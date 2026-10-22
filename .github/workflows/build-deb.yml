@@ -39,9 +39,18 @@ jobs:
           mkdir -p out/rootless
           mv packages/*.deb out/rootless/
 
-      - name: Upload debs
+      - name: Upload rootful deb
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: RxaaMenuDebug-deb
-          path: out/**/*.deb
-          if-no-files-found: error
+          name: Rxaa-rootful-deb
+          path: out/rootful/*.deb
+          if-no-files-found: warn
+
+      - name: Upload rootless deb
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Rxaa-rootless-deb
+          path: out/rootless/*.deb
+          if-no-files-found: warn

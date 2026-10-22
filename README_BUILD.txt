@@ -4,12 +4,16 @@ Rxaa Menu - iOS Debug Overlay
 WHAT THIS IS
 ------------
 A Theos tweak project named Rxaa. It adds a small floating icon button to apps.
-Tapping it opens a native Rxaa list with AimLock/ESP/Radar demo switches and a
-"Code Catalog" row. The Code Catalog opens the offline WebKit browser containing
-the menu-name/code catalog. The button icon is generated from menu_image.jpg.
+Tapping it opens a native Rxaa list with AimLock/ESP/Radar demo switches, a
+"Get Code" row, and Apply All / Reset All demo actions. Get Code opens the
+offline WebKit browser containing the menu-name/code catalog. The button icon is
+generated from menu_image.jpg.
 
 The switches are UI-only. They save ON/OFF in NSUserDefaults and update the
 label; they do not hook, read, or write any game process.
+
+Function reference: functions.txt documents every function/method in Tweak.x and
+the embedded HTML/JavaScript catalog.
 
 This is a UI-only debug/reference tool. It contains:
   - no game hooks
@@ -17,9 +21,9 @@ This is a UI-only debug/reference tool. It contains:
   - no aimbot, ESP, silent aim, or game offsets
   - no injector and no anti-cheat bypass
 
-It is also not a compiled .deb. This machine is Windows and has no Theos,
-clang, iOS SDK, ldid, or jailbreak packaging toolchain, so a working iOS binary
-cannot be produced here. This folder is the buildable source.
+No local .deb is produced on this Windows machine; it has no Theos, clang, iOS
+SDK, ldid, or jailbreak packaging toolchain. Use the included GitHub Actions
+workflow or a macOS/Linux Theos install.
 
 WHAT GETS PACKAGED
 ------------------
@@ -45,7 +49,7 @@ Option A: macOS or Linux with Theos
        export THEOS=$HOME/theos
        make clean package FINALPACKAGE=1
   3. The .deb appears in ./packages/ (normally
-     com.rxaa.menudebug_1.1.0_iphoneos-arm.deb).
+     com.rxaa.menudebug_1.1.1_iphoneos-arm.deb).
   4. Install it on a jailbroken device with Filza, Sileo, or:
        dpkg -i packages/*.deb
        killall -9 SpringBoard
@@ -59,25 +63,33 @@ RAACHEATMenuDebug.plist in the project root.
 Option B: GitHub Actions (no Mac required)
   Push this folder to a GitHub repository. The included workflow uses a macOS
   runner, installs Theos, builds both a rootful and a rootless .deb, and uploads
-  them as the artifact RxaaMenuDebug-deb. See .github/workflows/build-deb.yml.
+  two separate artifacts: Rxaa-rootful-deb and Rxaa-rootless-deb.
+  See .github/workflows/build-deb.yml.
 
 INSTALL NOTES
 -------------
 - Requires a jailbroken iOS 14+ device with MobileSubstrate/ElleKit.
-- The tweak filter is RAACHEATMenuDebug.plist and targets apps linked against
-  com.apple.UIKit. This satisfies Theos's required filter-plist stage.
-- The overlay is injected into processes that have UIApplication. It waits
-  about 1.5 seconds after process start, then adds the floating button.
+- The tweak filter is RAACHEATMenuDebug.plist. It matches apps linked against
+  com.apple.UIKit.
+- The overlay waits for an active UIWindowScene, then adds the floating button.
+  It retries for about 60 seconds and also retries when the app becomes active.
+- Fallback opening gesture: triple-tap with four fingers anywhere in the app.
+  This opens Rxaa even if the floating button is covered or off-screen.
 - The AimLock switch is a visual demo. It is ON/OFF only for the menu; there is
   no aimbot, memory write, or game hook behind it.
-- If the Rxaa icon does not appear in a specific app, that process may not link
-  UIKit. Change the Bundles entry in RAACHEATMenuDebug.plist to that app's bundle
-  identifier, or use com.apple.Security to target all processes.
+- Install the artifact that matches the jailbreak:
+    * rootful jailbreak -> Rxaa-rootful-deb
+    * rootless jailbreak (Dopamine/palera1n) -> Rxaa-rootless-deb
 - If the Rxaa icon does not appear:
+    * make sure the correct rootful/rootless package was installed
+    * respring/reboot userspace, then force-quit and reopen the app
     * check that the package is installed
     * check the catalog files exist at one of the two paths above
-    * respring/reboot userspace
     * check the tweak is enabled in your jailbreak's tweak injector
+    * check Console/log output for messages beginning with [Rxaa]
+- If the app does not link UIKit, add that app's bundle identifier to the
+  Bundles array in RAACHEATMenuDebug.plist. Do not use com.apple.Security unless
+  you really need every process, because it injects much more broadly.
 - The floating button's window is pass-through outside the button, so it does
   not block the underlying app. The Rxaa list itself opens as a full-screen
   modal with its own Close button.

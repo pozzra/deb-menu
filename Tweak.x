@@ -7,6 +7,9 @@
 static UIWindow *gOverlayWindow = nil;
 static UIButton *gFloatButton = nil;
 static UINavigationController *gMenuNav = nil;
+static UITapGestureRecognizer *gOpenGesture = nil;
+static UIWindow *gGestureWindow = nil;
+static UIWindow *gPreviousKeyWindow = nil;
 static int gInstallAttempts = 0;
 
 @interface RAACHEATPassThroughView : UIView
@@ -54,25 +57,69 @@ static NSString *RAACHEATCatalogPath(void) {
 @property (nonatomic, strong) WKWebView *webView;
 @end
 
-@interface RAACHEATRootController : UIViewController
+@interface RAACHEATRootController : UIViewController <UIGestureRecognizerDelegate>
 - (void)raacheatOpen;
 - (void)raacheatPan:(UIPanGestureRecognizer *)pan;
 @end
 
+static void RAACHEATRestorePreviousKeyWindow(void) {
+    if (gPreviousKeyWindow && gPreviousKeyWindow != gOverlayWindow) {
+        [gPreviousKeyWindow makeKeyWindow];
+    }
+    gPreviousKeyWindow = nil;
+}
+
 static void RAACHEATOpenPanel(void) {
-    if (!gOverlayWindow || gMenuNav) {
+    if (!gOverlayWindow) {
+        NSLog(@"[Rxaa] open ignored: overlay window is nil");
         return;
     }
 
     UIViewController *root = gOverlayWindow.rootViewController;
-    if (!root || root.presentedViewController) {
+    if (!root) {
+        NSLog(@"[Rxaa] open ignored: overlay root is nil");
         return;
     }
 
+    if (gMenuNav) {
+        if (root.presentedViewController == gMenuNav) {
+            NSLog(@"[Rxaa] open ignored: menu already presented");
+            return;
+        }
+        gMenuNav = nil;
+    }
+
+    if (root.presentedViewController) {
+        NSLog(@"[Rxaa] open ignored: another controller is presented: %@", root.presentedViewController);
+        return;
+    }
+
+    NSLog(@"[Rxaa] opening menu");
+    gPreviousKeyWindow = [UIApplication sharedApplication].keyWindow;
+    if (gPreviousKeyWindow == gOverlayWindow) {
+        gPreviousKeyWindow = nil;
+    }
+    if (!gPreviousKeyWindow) {
+        for (UIWindow *window in [UIApplication sharedApplication].windows) {
+            if (window != gOverlayWindow) {
+                gPreviousKeyWindow = window;
+                break;
+            }
+        }
+    }
+    [gOverlayWindow makeKeyAndVisible];
+
     RXAAMenuViewController *menu = [[RXAAMenuViewController alloc] initWithStyle:UITableViewStyleGrouped];
-    gMenuNav = [[UINavigationController alloc] initWithRootViewController:menu];
-    gMenuNav.modalPresentationStyle = UIModalPresentationFullScreen;
-    [root presentViewController:gMenuNav animated:YES completion:nil];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:menu];
+    nav.modalPresentationStyle = UIModalPresentationFullScreen;
+    gMenuNav = nav;
+    [root presentViewController:nav animated:YES completion:^{
+        if (root.presentedViewController != nav) {
+            NSLog(@"[Rxaa] presentation did not complete");
+            gMenuNav = nil;
+            RAACHEATRestorePreviousKeyWindow();
+        }
+    }];
 }
 
 @implementation RAACHEATRootController
@@ -91,6 +138,11 @@ static void RAACHEATOpenPanel(void) {
     CGPoint translation = [pan translationInView:view.superview];
     view.center = CGPointMake(view.center.x + translation.x, view.center.y + translation.y);
     [pan setTranslation:CGPointZero inView:view.superview];
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+    shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    return YES;
 }
 
 @end
@@ -135,6 +187,7 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
 - (void)closeMenu {
     [self.navigationController dismissViewControllerAnimated:YES completion:^{
         gMenuNav = nil;
+        RAACHEATRestorePreviousKeyWindow();
     }];
 }
 
@@ -146,7 +199,7 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     if (section == 0) {
         return (NSInteger)[RXAAFeatureTitles() count];
     }
-    return 1;
+    return 3;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
@@ -157,7 +210,7 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     if (section == 0) {
         return @"UI-only demo switches. They save ON/OFF locally and do not hook or modify any game.";
     }
-    return nil;
+    return @"Get Code opens the offline catalog. Apply All / Reset All only change the demo switch states.";
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -187,11 +240,21 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
         [sw addTarget:self action:@selector(toggleChanged:) forControlEvents:UIControlEventValueChanged];
         cell.accessoryView = sw;
     } else {
-        cell.textLabel.text = @"Code Catalog";
-        cell.detailTextLabel.text = @"Browse menu names, addresses and ARM64 xrefs";
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.accessoryView = nil;
+        if (indexPath.row == 0) {
+            cell.textLabel.text = @"Get Code";
+            cell.detailTextLabel.text = @"Browse menu names, addresses and ARM64 xrefs";
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        } else if (indexPath.row == 1) {
+            cell.textLabel.text = @"Apply All (Demo)";
+            cell.detailTextLabel.text = @"Turn all demo switches ON";
+            cell.accessoryType = UITableViewCellAccessoryNone;
+        } else {
+            cell.textLabel.text = @"Reset All (Demo)";
+            cell.detailTextLabel.text = @"Turn all demo switches OFF";
+            cell.accessoryType = UITableViewCellAccessoryNone;
+        }
     }
 
     return cell;
@@ -210,11 +273,23 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     cell.detailTextLabel.text = sender.isOn ? @"ON - UI demo" : @"OFF - UI demo";
 }
 
+- (void)setAllDemoSwitches:(BOOL)on {
+    for (NSString *key in RXAAFeatureKeys()) {
+        [[NSUserDefaults standardUserDefaults] setBool:on forKey:key];
+    }
+    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:0]
+                  withRowAnimation:UITableViewRowAnimationNone];
+}
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     if (indexPath.section == 1) {
-        RXAACatalogViewController *catalog = [[RXAACatalogViewController alloc] init];
-        [self.navigationController pushViewController:catalog animated:YES];
+        if (indexPath.row == 0) {
+            RXAACatalogViewController *catalog = [[RXAACatalogViewController alloc] init];
+            [self.navigationController pushViewController:catalog animated:YES];
+        } else {
+            [self setAllDemoSwitches:(indexPath.row == 1)];
+        }
     }
 }
 
@@ -256,6 +331,7 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
 - (void)closeMenu {
     [self.navigationController dismissViewControllerAnimated:YES completion:^{
         gMenuNav = nil;
+        RAACHEATRestorePreviousKeyWindow();
     }];
 }
 
@@ -265,8 +341,112 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
 
 @end
 
+static UIWindowScene *RAACHEATActiveWindowScene(void) {
+    if (@available(iOS 13.0, *)) {
+        UIApplication *app = [UIApplication sharedApplication];
+        UIWindowScene *fallback = nil;
+        for (UIScene *scene in app.connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
+            UIWindowScene *windowScene = (UIWindowScene *)scene;
+            if (windowScene.activationState == UISceneActivationStateForegroundActive) {
+                return windowScene;
+            }
+            if (!fallback && windowScene.activationState != UISceneActivationStateUnattached) {
+                fallback = windowScene;
+            }
+        }
+        if (fallback) {
+            return fallback;
+        }
+        for (UIWindow *window in app.windows) {
+            if (window.windowScene) {
+                return window.windowScene;
+            }
+        }
+    }
+    return nil;
+}
+
+static UIWindow *RAACHEATHostWindow(UIWindowScene *scene) {
+    UIApplication *app = [UIApplication sharedApplication];
+    if (app.keyWindow && app.keyWindow != gOverlayWindow) {
+        return app.keyWindow;
+    }
+    if (scene) {
+        UIWindow *fallback = nil;
+        for (UIWindow *window in scene.windows) {
+            if (window == gOverlayWindow) {
+                continue;
+            }
+            if (!window.hidden) {
+                return window;
+            }
+            if (!fallback) {
+                fallback = window;
+            }
+        }
+        if (fallback) {
+            return fallback;
+        }
+    }
+    for (UIWindow *window in app.windows) {
+        if (window != gOverlayWindow) {
+            return window;
+        }
+    }
+    return nil;
+}
+
+static void RAACHEATInstallOpenGesture(RAACHEATRootController *root, UIWindowScene *scene) {
+    UIWindow *host = RAACHEATHostWindow(scene);
+    if (!host || !root) {
+        return;
+    }
+    if (gOpenGesture && gGestureWindow == host &&
+        [host.gestureRecognizers containsObject:gOpenGesture]) {
+        return;
+    }
+    if (gOpenGesture && gGestureWindow) {
+        [gGestureWindow removeGestureRecognizer:gOpenGesture];
+    }
+    gOpenGesture = [[UITapGestureRecognizer alloc] initWithTarget:root action:@selector(raacheatOpen)];
+    gOpenGesture.numberOfTouchesRequired = 4;
+    gOpenGesture.numberOfTapsRequired = 3;
+    gOpenGesture.cancelsTouchesInView = NO;
+    gOpenGesture.delaysTouchesBegan = NO;
+    gOpenGesture.delegate = root;
+    [host addGestureRecognizer:gOpenGesture];
+    gGestureWindow = host;
+    NSLog(@"[Rxaa] fallback gesture installed on %@", host);
+}
+
+static void RAACHEATAttachWindowToScene(void) {
+    if (!gOverlayWindow) {
+        return;
+    }
+    if (@available(iOS 13.0, *)) {
+        UIWindowScene *scene = RAACHEATActiveWindowScene();
+        if (!scene) {
+            return;
+        }
+        if (gOverlayWindow.windowScene != scene) {
+            gOverlayWindow.windowScene = scene;
+        }
+        CGRect bounds = scene.coordinateSpace.bounds;
+        if (!CGRectIsEmpty(bounds)) {
+            gOverlayWindow.frame = bounds;
+        }
+        gOverlayWindow.hidden = NO;
+        UIViewController *root = gOverlayWindow.rootViewController;
+        root.view.frame = gOverlayWindow.bounds;
+        RAACHEATInstallOpenGesture((RAACHEATRootController *)root, scene);
+    }
+}
+
 static void RAACHEATInstallOverlay(void) {
-    if (gOverlayWindow || gInstallAttempts++ > 20) {
+    if (gOverlayWindow || gInstallAttempts++ > 40) {
         return;
     }
 
@@ -275,35 +455,39 @@ static void RAACHEATInstallOverlay(void) {
         return;
     }
 
+    UIWindowScene *scene = nil;
     if (@available(iOS 13.0, *)) {
-        for (UIScene *scene in app.connectedScenes) {
-            if ([scene isKindOfClass:[UIWindowScene class]]) {
-                gOverlayWindow = [[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
-                break;
-            }
+        scene = RAACHEATActiveWindowScene();
+        if (scene) {
+            gOverlayWindow = [[UIWindow alloc] initWithWindowScene:scene];
+        } else if (app.windows.count > 0) {
+            // Older/legacy apps can have windows without adopting UIScene.
+            NSLog(@"[Rxaa] no UIWindowScene; using legacy window fallback");
+            gOverlayWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        } else {
+            NSLog(@"[Rxaa] waiting for active UIWindowScene");
+            return;
         }
-        if (!gOverlayWindow) {
-            UIWindow *existing = app.windows.firstObject;
-            if (existing.windowScene) {
-                gOverlayWindow = [[UIWindow alloc] initWithWindowScene:existing.windowScene];
-            }
-        }
-    }
-
-    if (!gOverlayWindow) {
+    } else {
         gOverlayWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     }
 
-    gOverlayWindow.windowLevel = UIWindowLevelAlert + 1.0;
+    CGRect bounds = scene ? scene.coordinateSpace.bounds : [UIScreen mainScreen].bounds;
+    if (CGRectIsEmpty(bounds)) {
+        bounds = [UIScreen mainScreen].bounds;
+    }
+
+    gOverlayWindow.frame = bounds;
+    gOverlayWindow.windowLevel = UIWindowLevelAlert + 10.0;
     gOverlayWindow.backgroundColor = [UIColor clearColor];
     gOverlayWindow.rootViewController = [[RAACHEATRootController alloc] init];
     gOverlayWindow.hidden = NO;
 
     RAACHEATRootController *root = (RAACHEATRootController *)gOverlayWindow.rootViewController;
-    CGRect screen = [UIScreen mainScreen].bounds;
+    root.view.frame = bounds;
 
     gFloatButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    gFloatButton.frame = CGRectMake(screen.size.width - 66, 96, 52, 52);
+    gFloatButton.frame = CGRectMake(bounds.size.width - 66, 96, 52, 52);
     gFloatButton.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleBottomMargin;
     gFloatButton.backgroundColor = [UIColor colorWithRed:0.06 green:0.13 blue:0.10 alpha:0.94];
     gFloatButton.layer.cornerRadius = 26.0;
@@ -331,10 +515,21 @@ static void RAACHEATInstallOverlay(void) {
     [gFloatButton addGestureRecognizer:pan];
 
     [root.view addSubview:gFloatButton];
+    RAACHEATInstallOpenGesture(root, scene);
+    NSLog(@"[Rxaa] overlay installed scene=%@ bounds=%@", scene, NSStringFromCGRect(bounds));
 }
 
 static void RAACHEATTryInstall(void) {
     if (gOverlayWindow) {
+        RAACHEATAttachWindowToScene();
+        if (@available(iOS 13.0, *)) {
+            if (!gOverlayWindow.windowScene && gInstallAttempts <= 40) {
+                gInstallAttempts++;
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    RAACHEATTryInstall();
+                });
+            }
+        }
         return;
     }
     RAACHEATInstallOverlay();
@@ -345,8 +540,43 @@ static void RAACHEATTryInstall(void) {
     }
 }
 
+static void RAACHEATObserveLifecycle(void) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+        id activationToken = [center addObserverForName:UIApplicationDidBecomeActiveNotification
+                                                object:nil
+                                                 queue:[NSOperationQueue mainQueue]
+                                            usingBlock:^(NSNotification *note) {
+            gInstallAttempts = 0;
+            if (gOverlayWindow) {
+                RAACHEATAttachWindowToScene();
+            } else {
+                RAACHEATTryInstall();
+            }
+        }];
+        (void)activationToken;
+
+        if (@available(iOS 13.0, *)) {
+            id sceneToken = [center addObserverForName:UISceneDidActivateNotification
+                                                object:nil
+                                                 queue:[NSOperationQueue mainQueue]
+                                            usingBlock:^(NSNotification *note) {
+                gInstallAttempts = 0;
+                if (gOverlayWindow) {
+                    RAACHEATAttachWindowToScene();
+                } else {
+                    RAACHEATTryInstall();
+                }
+            }];
+            (void)sceneToken;
+        }
+    });
+}
+
 %ctor {
     @autoreleasepool {
+        RAACHEATObserveLifecycle();
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             RAACHEATTryInstall();
         });
