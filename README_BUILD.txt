@@ -1,17 +1,20 @@
-Rxaa Menu - iOS Debug Overlay
-=============================
+Rxa Menu - iOS Debug Overlay
+============================
+Contact / Telegram: @kun_amra
 
 WHAT THIS IS
 ------------
-A Theos tweak project named Rxaa. It adds a small floating icon button to apps.
-Tapping it opens a native Rxaa list with AimLock/ESP/Radar demo switches, a
-"Get Code" row, an "All Features" browser, and Apply All / Reset All demo
+A Theos tweak project named Rxa. It adds a small floating icon button to apps.
+Tapping it opens a native Rxa list with AimLock/ESP/Radar demo switches, a
+"Get Code" row, an "All Features" browser, a Telegram @kun_amra link, and Apply All / Reset All demo
 actions. All Features prefers menu_catalog.json, falls back to an embedded
-108-entry feature table if the JSON cannot be read, and lists the entries
+116-entry feature table if the JSON cannot be read, and lists the entries
 grouped by category; actionable entries have UI-only switches. Get Code opens
 the offline WebKit browser containing the menu-name/code catalog. The menu is
 presented full screen and refreshes its overlay bounds when the scene rotates
-or resizes. The button icon is generated from menu_image.jpg.
+or resizes. When the game changes windows or returns from a match, the overlay
+is re-shown and raised above normal game windows. The button icon is generated
+from menu_image.jpg.
 
 The switches are UI-only. They save ON/OFF in NSUserDefaults and update the
 label; they do not hook, read, or write any game process.
@@ -38,6 +41,10 @@ layout/Library/Application Support/RAACHEATMenuDebug/
   build_info.json     metadata
   menu_image.jpg      original menu icon
   menu_icon.png       192x192 icon used by the floating button
+  mod_menu.py         optional Python CLI/config generator
+
+layout/usr/bin/
+  rxa-menu            terminal launcher for mod_menu.py
 
 The tweak reads the catalog from:
   /var/jb/Library/Application Support/RAACHEATMenuDebug/index.html   (rootless)
@@ -52,14 +59,15 @@ Option A: macOS or Linux with Theos
   2. From this folder:
        export THEOS=$HOME/theos
        make clean package FINALPACKAGE=1
-  3. The .deb appears in ./packages/ (normally
-     com.rxaa.menudebug_1.2.1_iphoneos-arm.deb).
+  3. The .deb appears in ./packages/. Run ./build_deb.sh instead of make if
+     you want it copied to packages/Rxaa.deb automatically.
   4. Install it on a jailbroken device with Filza, Sileo, or:
-       dpkg -i packages/*.deb
+       dpkg -i packages/Rxaa.deb
        killall -9 SpringBoard
 
   Rootless jailbreak (iOS 15+, Dopamine/palera1n):
-       make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+       THEOS_PACKAGE_SCHEME=rootless ./build_deb.sh
+  The rootless copy is packages/Rxaa-rootless.deb.
 
 Build fix: The earlier "missing a filter property list" stage error is fixed by
 RAACHEATMenuDebug.plist in the project root.
@@ -67,8 +75,8 @@ RAACHEATMenuDebug.plist in the project root.
 Option B: GitHub Actions (no Mac required)
   Push this folder to a GitHub repository. The included workflow uses a macOS
   runner, installs Theos, builds both a rootful and a rootless .deb, and uploads
-  two separate artifacts: Rxaa-rootful-deb and Rxaa-rootless-deb.
-  See .github/workflows/build-deb.yml.
+  two artifacts. The rootful artifact contains Rxaa.deb; the rootless artifact
+  contains Rxaa-rootless.deb. See .github/workflows/build-deb.yml.
 
 INSTALL NOTES
 -------------
@@ -81,15 +89,18 @@ INSTALL NOTES
   This opens Rxaa even if the floating button is covered or off-screen.
 - The AimLock switch is a visual demo. It is ON/OFF only for the menu; there is
   no aimbot, memory write, or game hook behind it.
-- All Features lists the 108 feature entries from menu_catalog.json, or the
-  embedded fallback copy if the JSON is missing/unreadable: 63 actionable rows
-  have UI-only switches, and 45 label/help rows are read-only.
+- All Features lists the 116 feature entries from menu_catalog.json, or the
+  embedded fallback copy if the JSON is missing/unreadable: 70 actionable rows
+  have UI-only switches, and 46 label/help rows are read-only.
 - The menu is forced to UIModalPresentationFullScreen. If the device rotates or
   the scene resizes, the overlay window, root view, and floating button bounds
   are refreshed.
+- The overlay listens for app activation, scene activation, and key/visible
+  window changes. If the game creates a new match window, the overlay is
+  re-shown at UIWindowLevelAlert + 100 so the floating button remains reachable.
 - Install the artifact that matches the jailbreak:
-    * rootful jailbreak -> Rxaa-rootful-deb
-    * rootless jailbreak (Dopamine/palera1n) -> Rxaa-rootless-deb
+    * rootful jailbreak -> Rxaa.deb
+    * rootless jailbreak (Dopamine/palera1n) -> Rxaa-rootless.deb
 - If the Rxaa icon does not appear:
     * make sure the correct rootful/rootless package was installed
     * respring/reboot userspace, then force-quit and reopen the app
@@ -97,6 +108,10 @@ INSTALL NOTES
     * check the catalog files exist at one of the two paths above
     * check the tweak is enabled in your jailbreak's tweak injector
     * check Console/log output for messages beginning with [Rxaa]
+- If the menu disappears after joining a match, install the 1.2.4 build
+  (the overlay now re-shows itself when the game swaps key/visible windows).
+  If it still disappears, the game may be using a separate process or scene;
+  send the target bundle ID and [Rxaa] logs for diagnosis.
 - If the app does not link UIKit, add that app's bundle identifier to the
   Bundles array in RAACHEATMenuDebug.plist. Do not use com.apple.Security unless
   you really need every process, because it injects much more broadly.

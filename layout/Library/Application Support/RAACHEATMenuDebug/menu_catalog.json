@@ -6361,6 +6361,118 @@
         "0x0037eba4: add     x0, sp, #0x60",
         "0x0037eba8: bl      #0x45d430"
       ]
+    },
+    {
+      "label": "AIMLOCK 100%",
+      "va": "0x0000_ros_deb",
+      "category": "aimbot",
+      "kind": "toggle",
+      "meta": {
+        "source": "ROS.deb",
+        "package": "com.netease.chiji",
+        "note": "AimLock module extracted from ROS.deb (ros.dylib)"
+      },
+      "asm": [
+        "; Extracted from ROS.deb (com.netease.chiji)"
+      ]
+    },
+    {
+      "label": "AIMBOT 360",
+      "va": "0x0000_ros_deb",
+      "category": "aimbot",
+      "kind": "toggle",
+      "meta": {
+        "source": "ROS.deb",
+        "package": "com.netease.chiji",
+        "note": "360 degree aimbot arc from ROS.deb"
+      },
+      "asm": [
+        "; Extracted from ROS.deb (com.netease.chiji)"
+      ]
+    },
+    {
+      "label": "AIMBOT 180",
+      "va": "0x0000_ros_deb",
+      "category": "aimbot",
+      "kind": "toggle",
+      "meta": {
+        "source": "ROS.deb",
+        "package": "com.netease.chiji",
+        "note": "180 degree forward aimbot arc from ROS.deb"
+      },
+      "asm": [
+        "; Extracted from ROS.deb (com.netease.chiji)"
+      ]
+    },
+    {
+      "label": "WALLHACK",
+      "va": "0x0000_ros_deb",
+      "category": "visuals",
+      "kind": "toggle",
+      "meta": {
+        "source": "ROS.deb",
+        "package": "com.netease.chiji",
+        "note": "DLGMem / LengZz wallhack module from ROS.deb"
+      },
+      "asm": [
+        "; Extracted from ROS.deb (com.netease.chiji)"
+      ]
+    },
+    {
+      "label": "NO RECOIL 100%",
+      "va": "0x0000_ros_deb",
+      "category": "memory",
+      "kind": "toggle",
+      "meta": {
+        "source": "ROS.deb",
+        "package": "com.netease.chiji",
+        "note": "Zero recoil memory patch from ROS.deb"
+      },
+      "asm": [
+        "; Extracted from ROS.deb (com.netease.chiji)"
+      ]
+    },
+    {
+      "label": "SPEED",
+      "va": "0x0000_ros_deb",
+      "category": "memory",
+      "kind": "toggle",
+      "meta": {
+        "source": "ROS.deb",
+        "package": "com.netease.chiji",
+        "note": "Movement speed patch from ROS.deb"
+      },
+      "asm": [
+        "; Extracted from ROS.deb (com.netease.chiji)"
+      ]
+    },
+    {
+      "label": "SPEED EPIC",
+      "va": "0x0000_ros_deb",
+      "category": "memory",
+      "kind": "toggle",
+      "meta": {
+        "source": "ROS.deb",
+        "package": "com.netease.chiji",
+        "note": "High-multiplier speed patch from ROS.deb"
+      },
+      "asm": [
+        "; Extracted from ROS.deb (com.netease.chiji)"
+      ]
+    },
+    {
+      "label": "MOD HACK",
+      "va": "0x0000_ros_deb",
+      "category": "settings",
+      "kind": "label",
+      "meta": {
+        "source": "ROS.deb",
+        "package": "com.netease.chiji",
+        "note": "LengZz ROS Hack Header"
+      },
+      "asm": [
+        "; Extracted from ROS.deb (com.netease.chiji)"
+      ]
     }
   ]
 }

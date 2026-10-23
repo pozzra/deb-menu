@@ -1,17 +1,21 @@
 {
   "app": "Rxaa Menu Code - Debug Catalog",
-  "version": "1.2.1",
+  "version": "1.2.4",
   "generated": "2026-10-23",
-  "source_apk": "ESP Cracked.apk",
-  "source_library": "lib/arm64-v8a/libRAACHEAT.so",
-  "library_sha256": "496CDCF1D3E8AF13A548B7BD7226D4A5963B3E44A95B65BB86E8060FD14A261D",
-  "entries": 189,
-  "feature_entries": 108,
+  "telegram": "@kun_amra",
+  "theme": "Pure Black (#000000)",
+  "icon": "Black Icon with Glowing 'R'",
+  "sources": [
+    "ESP Cracked.apk (libRAACHEAT.so)",
+    "ROS.deb (ros.dylib / com.netease.chiji)"
+  ],
+  "entries": 197,
+  "feature_entries": 116,
   "categories": {
-    "aimbot": 41,
-    "visuals": 48,
-    "memory": 6,
-    "settings": 9,
+    "aimbot": 44,
+    "visuals": 49,
+    "memory": 9,
+    "settings": 10,
     "help": 4,
     "ui": 24,
     "ui-id": 38,
@@ -20,9 +24,9 @@
     "path": 3
   },
   "data_store": "menu_catalog.json",
-  "notes": "Static analysis only. This is a code browser, not a functional cheat build.",
   "package": "com.rxaa.menudebug",
-  "native_features": 108,
-  "native_feature_screen": "All Features",
-  "embedded_features": 108
+  "bundled_python_engine": "mod_menu.py",
+  "terminal_command": "rxa-menu",
+  "overlay_watchdog": true,
+  "window_level": "UIWindowLevelAlert + 100"
 }

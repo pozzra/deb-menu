@@ -1,0 +1,23 @@
+#!/bin/sh
+# Launcher for Rxa Mod Menu & Config Generator (Python Engine)
+# Bundled in com.rxaa.menudebug (v1.2.4)
+
+SCRIPT_PATH="/Library/Application Support/RAACHEATMenuDebug/mod_menu.py"
+if [ ! -f "$SCRIPT_PATH" ]; then
+    SCRIPT_PATH="/var/jb/Library/Application Support/RAACHEATMenuDebug/mod_menu.py"
+fi
+
+if [ ! -f "$SCRIPT_PATH" ]; then
+    echo "[!] Could not locate mod_menu.py"
+    exit 1
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+    exec python3 "$SCRIPT_PATH" --cli "$@"
+elif command -v python >/dev/null 2>&1; then
+    exec python "$SCRIPT_PATH" --cli "$@"
+else
+    echo "[!] Python 3 is required to run Rxa mod menu in terminal."
+    echo "[!] Install python3 from Sileo / Zebra (Procursus repository)."
+    exit 1
+fi

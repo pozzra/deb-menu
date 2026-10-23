@@ -27,7 +27,7 @@ static UIColor *RXAAGreen(void) {
 }
 
 static UIColor *RXAABackground(void) {
-    return [UIColor colorWithRed:0.04 green:0.07 blue:0.10 alpha:1.0];
+    return [UIColor blackColor];
 }
 
 static NSString *RAACHEATResourcePath(NSString *name) {
@@ -58,6 +58,14 @@ typedef struct {
 } RXAAEmbeddedFeature;
 
 static const RXAAEmbeddedFeature kRXAAEmbeddedFeatures[] = {
+    {"AIMLOCK 100%", "aimbot", "toggle"},
+    {"AIMBOT 360", "aimbot", "toggle"},
+    {"AIMBOT 180", "aimbot", "toggle"},
+    {"WALLHACK", "visuals", "toggle"},
+    {"NO RECOIL 100%", "memory", "toggle"},
+    {"SPEED", "memory", "toggle"},
+    {"SPEED EPIC", "memory", "toggle"},
+    {"MOD HACK", "settings", "label"},
     {"AimBot / AimLock Enable", "aimbot", "toggle"},
     {"Aim FOV Radius", "aimbot", "slider"},
     {"Aim Lock Distance", "aimbot", "slider"},
@@ -368,6 +376,8 @@ static void RAACHEATOpenPanel(void) {
 
     NSLog(@"[Rxaa] opening menu");
     RAACHEATRefreshOverlayBounds();
+    gOverlayWindow.hidden = NO;
+    gOverlayWindow.windowLevel = UIWindowLevelAlert + 100.0;
     gPreviousKeyWindow = RAACHEATKeyWindowForScene(nil);
     if (gPreviousKeyWindow == gOverlayWindow) {
         gPreviousKeyWindow = nil;
@@ -452,11 +462,11 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
         initWithTitle:@"Close"
                 style:UIBarButtonItemStyleDone
-               target:self
-               action:@selector(closeMenu)];
+                target:self
+                action:@selector(closeMenu)];
 
     self.tableView.backgroundColor = RXAABackground();
-    self.tableView.separatorColor = [UIColor colorWithWhite:0.16 alpha:1.0];
+    self.tableView.separatorColor = [UIColor colorWithWhite:0.10 alpha:1.0];
     self.tableView.tableFooterView = [[UIView alloc] init];
     self.tableView.rowHeight = 58.0;
 
@@ -487,7 +497,7 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     if (section == 0) {
         return (NSInteger)[RXAAFeatureTitles() count];
     }
-    return 4;
+    return 6;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
@@ -498,7 +508,7 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     if (section == 0) {
         return @"UI-only demo switches. They save ON/OFF locally and do not hook or modify any game.";
     }
-    return @"Get Code opens the offline catalog. All Features lists the catalog entries. Apply All / Reset All only change demo switch states.";
+    return @"Rxaa UI Debug Menu | Telegram: @kun_amra\nGet Code opens the offline catalog. Python Engine provides terminal CLI & config generation.";
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -506,7 +516,7 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellID];
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:cellID];
-        cell.backgroundColor = [UIColor colorWithRed:0.07 green:0.10 blue:0.14 alpha:1.0];
+        cell.backgroundColor = [UIColor colorWithWhite:0.04 alpha:1.0];
         cell.textLabel.textColor = [UIColor whiteColor];
         cell.detailTextLabel.textColor = [UIColor colorWithWhite:0.62 alpha:1.0];
     }
@@ -543,10 +553,18 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
             cell.textLabel.text = @"Apply All (Demo)";
             cell.detailTextLabel.text = @"Turn all demo switches ON";
             cell.accessoryType = UITableViewCellAccessoryNone;
-        } else {
+        } else if (indexPath.row == 3) {
             cell.textLabel.text = @"Reset All (Demo)";
             cell.detailTextLabel.text = @"Turn all demo switches OFF";
             cell.accessoryType = UITableViewCellAccessoryNone;
+        } else if (indexPath.row == 4) {
+            cell.textLabel.text = @"Python Engine (mod_menu.py)";
+            cell.detailTextLabel.text = @"CLI & Config Generator in Application Support";
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        } else {
+            cell.textLabel.text = @"Telegram: @kun_amra";
+            cell.detailTextLabel.text = @"Tap to open official Telegram channel";
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         }
     }
 
@@ -589,8 +607,17 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
         } else if (indexPath.row == 1) {
             RXAACatalogFeatureViewController *features = [[RXAACatalogFeatureViewController alloc] init];
             [self.navigationController pushViewController:features animated:YES];
-        } else {
+        } else if (indexPath.row == 2 || indexPath.row == 3) {
             [self setAllDemoSwitches:(indexPath.row == 2)];
+        } else if (indexPath.row == 4) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Rxa Python Engine"
+                message:@"mod_menu.py is bundled in your tweak Application Support directory.\n\nTo run on iOS:\n1. Open Terminal (NewTerm or SSH)\n2. Type 'rxa-menu'\n   (or python3 mod_menu.py --cli)\n\nSupports full interactive CLI, preset loading, and config file generation."
+                preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+        } else if (indexPath.row == 5) {
+            NSURL *url = [NSURL URLWithString:@"https://t.me/kun_amra"];
+            [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
         }
     }
 }
@@ -865,6 +892,25 @@ static void RAACHEATAttachWindowToScene(void) {
     }
 }
 
+static void RAACHEATEnsureOverlayVisible(void) {
+    if (!gOverlayWindow) {
+        return;
+    }
+
+    BOOL wasHidden = gOverlayWindow.hidden;
+    RAACHEATAttachWindowToScene();
+    gOverlayWindow.hidden = NO;
+    gOverlayWindow.windowLevel = UIWindowLevelAlert + 100.0;
+
+    if (gMenuNav) {
+        [gOverlayWindow makeKeyAndVisible];
+    }
+
+    if (wasHidden) {
+        NSLog(@"[Rxaa] overlay re-shown");
+    }
+}
+
 static void RAACHEATInstallOverlay(void) {
     if (gOverlayWindow || gInstallAttempts++ > 40) {
         return;
@@ -898,7 +944,7 @@ static void RAACHEATInstallOverlay(void) {
     }
 
     gOverlayWindow.frame = bounds;
-    gOverlayWindow.windowLevel = UIWindowLevelAlert + 10.0;
+    gOverlayWindow.windowLevel = UIWindowLevelAlert + 100.0;
     gOverlayWindow.backgroundColor = [UIColor clearColor];
     gOverlayWindow.rootViewController = [[RAACHEATRootController alloc] init];
     gOverlayWindow.hidden = NO;
@@ -970,7 +1016,7 @@ static void RAACHEATObserveLifecycle(void) {
                                             usingBlock:^(NSNotification *note) {
             gInstallAttempts = 0;
             if (gOverlayWindow) {
-                RAACHEATAttachWindowToScene();
+                RAACHEATEnsureOverlayVisible();
             } else {
                 RAACHEATTryInstall();
             }
@@ -984,13 +1030,43 @@ static void RAACHEATObserveLifecycle(void) {
                                             usingBlock:^(NSNotification *note) {
                 gInstallAttempts = 0;
                 if (gOverlayWindow) {
-                    RAACHEATAttachWindowToScene();
+                    RAACHEATEnsureOverlayVisible();
                 } else {
                     RAACHEATTryInstall();
                 }
             }];
             (void)sceneToken;
         }
+
+        id keyToken = [center addObserverForName:UIWindowDidBecomeKeyNotification
+                                          object:nil
+                                           queue:[NSOperationQueue mainQueue]
+                                      usingBlock:^(NSNotification *note) {
+            if (!gOverlayWindow) {
+                return;
+            }
+            if ([note.object isKindOfClass:[UIWindow class]] &&
+                note.object == gOverlayWindow) {
+                return;
+            }
+            RAACHEATEnsureOverlayVisible();
+        }];
+        (void)keyToken;
+
+        id visibleToken = [center addObserverForName:UIWindowDidBecomeVisibleNotification
+                                              object:nil
+                                               queue:[NSOperationQueue mainQueue]
+                                          usingBlock:^(NSNotification *note) {
+            if (!gOverlayWindow) {
+                return;
+            }
+            if ([note.object isKindOfClass:[UIWindow class]] &&
+                note.object == gOverlayWindow) {
+                return;
+            }
+            RAACHEATEnsureOverlayVisible();
+        }];
+        (void)visibleToken;
     });
 }
 

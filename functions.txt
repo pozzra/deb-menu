@@ -1,7 +1,7 @@
 RXAA iOS MENU - FUNCTION REFERENCE
 ==================================
 Generated: 2026-10-23
-Updated:   2026-10-23 for Rxaa 1.2.1
+Updated:   2026-10-23 for Rxaa 1.2.4
 Project:   C:\Users\PC\Desktop\Roses-Mod-Menu-master\RAACHEAT_iOS_Menu_Debug
 Primary:   Tweak.x
 Web app:   layout\Library\Application Support\RAACHEATMenuDebug\index.html
@@ -43,13 +43,14 @@ RAACHEATMenuDebug.plist
 control
   Package: com.rxaa.menudebug
   Name: Rxaa
-  Version: 1.2.1
+  Version: 1.2.4
 
 GLOBAL STATE (Tweak.x)
 ----------------------
 gOverlayWindow
-  The transparent UIWindow at UIWindowLevelAlert + 1 that hosts the floating
-  button. Created once per process by RAACHEATInstallOverlay.
+  The transparent UIWindow at UIWindowLevelAlert + 100 that hosts the floating
+  button. Created once per process by RAACHEATInstallOverlay. It is raised again
+  when the app/scene activates or another window becomes key/visible.
 
 gFloatButton
   The 52x52 draggable button. Uses menu_icon.png/menu_image.jpg as its
@@ -92,14 +93,17 @@ STARTUP / CALL FLOW
 8. RAACHEATOpenPanel presents RXAAMenuViewController inside a
    UINavigationController.
 9. The table shows AimLock/ESP/Radar switches, Get Code, All Features,
-   Apply All (Demo), and Reset All (Demo).
+   Apply All (Demo), Reset All (Demo), Python Engine, and Telegram.
 10. Tapping All Features pushes RXAACatalogFeatureViewController, which uses
-    menu_catalog.json or the embedded 108-entry fallback.
+    menu_catalog.json or the embedded 116-entry fallback.
 11. Tapping Get Code pushes RXAACatalogViewController, which loads
     index.html into a WKWebView.
-12. Close dismisses the navigation controller and clears gMenuNav.
-13. UIApplicationDidBecomeActiveNotification and UISceneDidActivateNotification
-    reattach the overlay/gesture or retry installation.
+12. Tapping Python Engine shows terminal instructions for mod_menu.py; tapping
+    Telegram opens https://t.me/kun_amra.
+13. Close dismisses the navigation controller and clears gMenuNav.
+14. UIApplicationDidBecomeActiveNotification, UISceneDidActivateNotification,
+    UIWindowDidBecomeKeyNotification, and UIWindowDidBecomeVisibleNotification
+    re-show/raise the overlay or retry installation.
 
 
 PART 1 - TWEAK.X FUNCTIONS
@@ -251,7 +255,8 @@ PART 1 - TWEAK.X FUNCTIONS
    Behavior
      1. Logs "[Rxaa] opening menu".
      2. Calls RAACHEATRefreshOverlayBounds so the overlay and root view match
-        the current UIWindowScene before presenting.
+        the current UIWindowScene, sets hidden = NO, and raises the window to
+        UIWindowLevelAlert + 100 before presenting.
      3. Saves the current app key window in gPreviousKeyWindow via
         RAACHEATKeyWindowForScene(nil). If no key window is found, uses the
         first non-overlay app window.
@@ -553,7 +558,8 @@ PART 1 - TWEAK.X FUNCTIONS
 
     Sections
       0 = FEATURES (AimLock/ESP/Radar switches)
-      1 = TOOLS (Get Code, All Features, Apply All, Reset All)
+      1 = TOOLS (Get Code, All Features, Apply All, Reset All, Python Engine,
+          Telegram)
 
 15. RXAAMenuViewController -tableView:numberOfRowsInSection:
     Signature: - (NSInteger)tableView:(UITableView *)tableView
@@ -570,7 +576,8 @@ PART 1 - TWEAK.X FUNCTIONS
 
     Returns
       Section 0: RXAAFeatureTitles().count, currently 3.
-      Section 1: 4 (Get Code, All Features, Apply All, Reset All).
+      Section 1: 6 (Get Code, All Features, Apply All, Reset All, Python
+      Engine, Telegram).
 
     Behavior
       Uses the titles array as the source of truth for the feature count.
@@ -609,8 +616,10 @@ PART 1 - TWEAK.X FUNCTIONS
         "UI-only demo switches. They save ON/OFF locally and do not hook or
          modify any game."
       Section 1:
-        "Get Code opens the offline catalog. All Features lists the catalog
-         entries. Apply All / Reset All only change demo switch states."
+        "Rxaa UI Debug Menu | Telegram: @kun_amra
+         Get Code opens the offline catalog. Python Engine provides terminal
+         CLI & config generation. Apply All / Reset All only change demo
+         switch states."
 
 18. RXAAMenuViewController -tableView:cellForRowAtIndexPath:
     Signature: - (UITableViewCell *)tableView:(UITableView *)tableView
@@ -620,7 +629,8 @@ PART 1 - TWEAK.X FUNCTIONS
 
     Purpose
       Build each row: feature switch rows in section 0, and the Get Code /
-      Apply All / Reset All rows in section 1.
+      All Features / Apply All / Reset All / Python Engine / Telegram rows in
+      section 1.
 
     Parameters
       tableView - the Rxaa table.
@@ -642,13 +652,17 @@ PART 1 - TWEAK.X FUNCTIONS
       - Row 0: title "Get Code", subtitle "Browse menu names, addresses and
         ARM64 xrefs", disclosure indicator.
       - Row 1: dynamic title "All Features (N)" where N is the number of
-        catalog feature entries (currently 108); subtitle "Browse every catalog
+        catalog feature entries (currently 116); subtitle "Browse every catalog
         feature entry"; disclosure indicator.
       - Row 2: title "Apply All (Demo)", subtitle "Turn all demo switches ON",
         no accessory.
       - Row 3: title "Reset All (Demo)", subtitle "Turn all demo switches OFF",
         no accessory.
-      - All four rows are selectable.
+      - Row 4: title "Python Engine (mod_menu.py)", subtitle "CLI & Config
+        Generator in Application Support", disclosure indicator.
+      - Row 5: title "Telegram: @kun_amra", subtitle "Tap to open official
+        Telegram channel", disclosure indicator.
+      - All six rows are selectable.
 
     Side effects
       Creates a new UISwitch each time a feature cell is configured.
@@ -684,7 +698,8 @@ PART 1 - TWEAK.X FUNCTIONS
     Class:    RXAAMenuViewController
 
     Purpose
-      Handle the Get Code, All Features, Apply All, and Reset All rows.
+      Handle the Get Code, All Features, Apply All, Reset All, Python Engine,
+      and Telegram rows.
 
     Parameters
       tableView - the Rxaa table.
@@ -701,9 +716,14 @@ PART 1 - TWEAK.X FUNCTIONS
         RXAACatalogFeatureViewController and pushes it.
       - If section 1 row 2 was selected, calls -setAllDemoSwitches:YES.
       - If section 1 row 3 was selected, calls -setAllDemoSwitches:NO.
+      - If section 1 row 4 was selected, presents a UIAlertController that
+        explains how to run mod_menu.py through `rxa-menu` in a terminal.
+      - If section 1 row 5 was selected, opens https://t.me/kun_amra with
+        UIApplication openURL:options:completionHandler:.
 
     Side effects
-      Navigation push or demo NSUserDefaults writes.
+      Navigation push, demo NSUserDefaults writes, an alert presentation, or
+      opening the Telegram URL.
 
 20a. RXAAMenuViewController -setAllDemoSwitches:
     Signature: - (void)setAllDemoSwitches:(BOOL)on
@@ -860,7 +880,8 @@ PART 1 - TWEAK.X FUNCTIONS
       - On iOS 12 and older, creates a frame-based UIWindow.
 
     Behavior
-      - Sets windowLevel = UIWindowLevelAlert + 10.
+      - Sets windowLevel = UIWindowLevelAlert + 100 so the overlay stays above
+        normal game HUD/window layers.
       - Makes the window transparent.
       - Installs RAACHEATRootController and sets the root view frame.
       - Sets hidden = NO (does not call makeKeyAndVisible).
@@ -1017,13 +1038,36 @@ PART 1 - TWEAK.X FUNCTIONS
       - Updates the root view frame.
       - Reinstalls the fallback gesture.
 
+32a. RAACHEATEnsureOverlayVisible
+     Signature: static void RAACHEATEnsureOverlayVisible(void)
+     Location: Tweak.x
+
+     Purpose
+       Re-show and re-raise the overlay after the game changes windows, enters a
+       match, returns to the foreground, or switches scenes.
+
+     Behavior
+       - Returns if gOverlayWindow is nil.
+       - Records whether the window was hidden.
+       - Calls RAACHEATAttachWindowToScene.
+       - Sets hidden = NO.
+       - Sets windowLevel = UIWindowLevelAlert + 100.
+       - If gMenuNav is non-nil, calls makeKeyAndVisible so menu input stays
+         active.
+       - Logs "[Rxaa] overlay re-shown" only when the window had been hidden.
+
+     Side effects
+       Window visibility/level changes and scene reattachment. No game process
+       access.
+
 33. RAACHEATObserveLifecycle
     Signature: static void RAACHEATObserveLifecycle(void)
     Location: Tweak.x
 
     Purpose
-      Retry/reattach the overlay when the app becomes active or a scene
-      activates.
+      Keep the overlay alive when the app becomes active, a scene activates, or
+      another window becomes key/visible (for example when a game joins a match
+      and swaps windows).
 
     Parameters
       None.
@@ -1035,8 +1079,15 @@ PART 1 - TWEAK.X FUNCTIONS
       Uses dispatch_once to register:
       - UIApplicationDidBecomeActiveNotification
       - UISceneDidActivateNotification (iOS 13+)
-      Each handler resets gInstallAttempts, then either attaches the existing
-      window or calls RAACHEATTryInstall.
+      - UIWindowDidBecomeKeyNotification
+      - UIWindowDidBecomeVisibleNotification
+      Each handler resets gInstallAttempts, then either calls
+      RAACHEATEnsureOverlayVisible for an existing window or calls
+      RAACHEATTryInstall.
+
+    Notes
+      The key/visible observers keep the overlay above a newly-created game
+      match window. They do not inspect or modify game data.
 
 
 PART 1B - CATALOG-DRIVEN FEATURE BROWSER
@@ -1044,7 +1095,7 @@ PART 1B - CATALOG-DRIVEN FEATURE BROWSER
 These functions/classes load menu_catalog.json and build the "All Features"
 screen. The JSON is read from the installed resource directory, filtered to the
 five feature categories, and displayed as grouped UI-only rows. If the JSON is
-missing, malformed, or empty, an embedded 108-entry feature table is used
+missing, malformed, or empty, an embedded 116-entry feature table is used
 instead, so All Features is not empty in a sandboxed/unreadable-resource case.
 No game process is contacted.
 
@@ -1060,7 +1111,7 @@ No game process is contacted.
 
    Notes
      These are the categories counted as feature_entries in build_info.json
-     (108 total).
+     (116 total).
 
 2. RXAACatalogFeatures
    Signature: static NSArray<NSDictionary *> *RXAACatalogFeatures(void)
@@ -1076,16 +1127,16 @@ No game process is contacted.
      - Keeps dictionaries whose "category" is in RXAACatalogCategories.
      - Requires string values for "category" and "label".
      - If zero features were loaded, logs the missing path and calls
-       RXAAEmbeddedCatalogFeatures for the built-in 108-entry fallback.
+       RXAAEmbeddedCatalogFeatures for the built-in 116-entry fallback.
      - Caches the filtered/fallback array with dispatch_once.
 
    Returns
-     The cached feature array. For this build it contains 108 entries even if
+     The cached feature array. For this build it contains 116 entries even if
      the external JSON cannot be read.
 
    Notes
-     The screen displays all 108 feature entries: 63 actionable entries
-     (config-key/toggle/slider/combo) and 45 read-only label/help entries.
+     The screen displays all 116 feature entries: 70 actionable entries
+     (config-key/toggle/slider/combo) and 46 read-only label/help entries.
 
 2a. RXAAEmbeddedFeature / kRXAAEmbeddedFeatures
     Signature: typedef struct {
@@ -1097,12 +1148,12 @@ No game process is contacted.
     Location: Tweak.x
 
     Purpose
-      Compile-time copy of the 108 feature labels/categories/kinds used when
+      Compile-time copy of the 116 feature labels/categories/kinds used when
       menu_catalog.json is unavailable.
 
     Contents
-      - 108 rows: 41 aimbot, 48 visuals, 6 memory, 9 settings, 4 help.
-      - 63 actionable rows and 45 label/help rows.
+      - 116 rows: 44 aimbot, 49 visuals, 9 memory, 10 settings, 4 help.
+      - 70 actionable rows and 46 label/help rows.
       - Only the fields used by the All Features UI are stored; no offsets,
         xrefs, meta flags, or memory addresses are embedded.
 
@@ -1126,7 +1177,7 @@ No game process is contacted.
       - Returns the mutable array.
 
     Returns
-      An array of 108 feature dictionaries.
+      An array of 116 feature dictionaries.
 
     Used by
       RXAACatalogFeatures when the external JSON yields zero features.
@@ -1158,7 +1209,7 @@ No game process is contacted.
      "rxaa.catalog.<category>.<label>".
 
    Notes
-     Labels are unique in the current 108-entry feature set, so this key is
+     Labels are unique in the current 116-entry feature set, so this key is
      stable for this catalog build.
 
 5. RXAACatalogFeatureIsActionable
@@ -1526,27 +1577,38 @@ RAACHEATMenuDebug.plist
   Fixes the Theos "missing a filter property list" stage error.
 
 build_deb.sh
-  Shell helper. Checks THEOS and runs:
+  Shell helper. Checks THEOS, runs:
     make clean package FINALPACKAGE=1
+  then copies the result to packages/Rxaa.deb (or
+  packages/Rxaa-rootless.deb when THEOS_PACKAGE_SCHEME=rootless).
   Not a function; not used by GitHub Actions.
+
+layout/usr/bin/rxa-menu
+  Shell launcher for mod_menu.py. It checks the rootful and /var/jb rootless
+  Application Support paths, then runs python3 mod_menu.py --cli.
+
+layout/Library/Application Support/RAACHEATMenuDebug/mod_menu.py
+  Optional Python CLI/GUI config generator. It is not loaded by the tweak and
+  does not hook or modify a game process.
 
 .github/workflows/build-deb.yml
   GitHub Actions workflow:
     1. macOS runner.
     2. Install ldid/xz and Theos + iPhoneOS SDK.
-    3. Build rootful package.
-    4. Build rootless package (continue-on-error).
-    5. Upload out/rootful/*.deb as Rxaa-rootful-deb.
-    6. Upload out/rootless/*.deb as Rxaa-rootless-deb.
+    3. Build rootful package and copy it to out/rootful/Rxaa.deb.
+    4. Build rootless package and copy it to out/rootless/Rxaa-rootless.deb
+       (continue-on-error).
+    5. Upload out/rootful/Rxaa.deb as the Rxaa-deb artifact.
+    6. Upload out/rootless/Rxaa-rootless.deb as the Rxaa-rootless-deb
+       artifact.
 
 EXPECTED OUTPUT
 ---------------
 Rootful:
-  packages/com.rxaa.menudebug_1.2.1_iphoneos-arm.deb
+  packages/Rxaa.deb
 
 Rootless:
-  packages/com.rxaa.menudebug_1.2.1_iphoneos-arm64.deb
-  (actual name may vary with Theos packaging scheme)
+  packages/Rxaa-rootless.deb
 
 INSTALL TARGETS
 ---------------

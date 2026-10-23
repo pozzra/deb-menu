@@ -28,29 +28,37 @@ jobs:
 
       - name: Build rootful package
         run: |
+          chmod +x layout/usr/bin/rxa-menu
           make clean package FINALPACKAGE=1
           mkdir -p out/rootful
           mv packages/*.deb out/rootful/
+          src="$(find out/rootful -maxdepth 1 -name '*.deb' | head -n 1)"
+          cp "$src" out/rootful/Rxaa.deb
+          test -s out/rootful/Rxaa.deb
 
       - name: Build rootless package
         continue-on-error: true
         run: |
+          chmod +x layout/usr/bin/rxa-menu
           make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
           mkdir -p out/rootless
           mv packages/*.deb out/rootless/
+          src="$(find out/rootless -maxdepth 1 -name '*.deb' | head -n 1)"
+          cp "$src" out/rootless/Rxaa-rootless.deb
+          test -s out/rootless/Rxaa-rootless.deb
 
-      - name: Upload rootful deb
+      - name: Upload rootful Rxaa.deb
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Rxaa-rootful-deb
-          path: out/rootful/*.deb
+          name: Rxaa-deb
+          path: out/rootful/Rxaa.deb
           if-no-files-found: warn
 
-      - name: Upload rootless deb
+      - name: Upload rootless Rxaa-rootless.deb
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Rxaa-rootless-deb
-          path: out/rootless/*.deb
+          path: out/rootless/Rxaa-rootless.deb
           if-no-files-found: warn

@@ -12,6 +12,20 @@ if [[ ! -d "${THEOS}/makefiles" ]]; then
 fi
 
 make clean package FINALPACKAGE=1 "$@"
+
+src="$(find packages -maxdepth 1 -type f -name '*.deb' ! -name 'Rxaa*.deb' | head -n 1)"
+if [[ -z "${src}" ]]; then
+  echo "No .deb was produced in packages/" >&2
+  exit 1
+fi
+
+if [[ "${THEOS_PACKAGE_SCHEME:-}" == "rootless" ]]; then
+  target="packages/Rxaa-rootless.deb"
+else
+  target="packages/Rxaa.deb"
+fi
+
+cp "${src}" "${target}"
 echo
-echo "Built packages:"
-ls -1 packages/*.deb 2>/dev/null || true
+echo "Built package: ${src}"
+echo "Named copy:    ${target}"

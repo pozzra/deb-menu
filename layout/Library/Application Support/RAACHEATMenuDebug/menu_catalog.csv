@@ -188,3 +188,11 @@ runtime,diagnostic,WAITING FOR LIBCLIENT,0x000511a9,2688,0x0037d404,,,
 path,path,/data/data/net.roslegacy.prod/imgui,0x00053a48,3208,0x0037d458,,,
 path,path,/data/data/net.roslegacy.prod/imgui/menu_config.txt,0x00054446,3332,0x0037d470;0x0037d4f0,,,
 path,path,/data/data/net.roslegacy.prod/imgui/speed-memory.cfg,0x00054729,3365,0x0037eb74,,,
+aimbot,toggle,AIMLOCK 100%,0x0000_ros_deb,,,,,AimLock module extracted from ROS.deb (ros.dylib)
+aimbot,toggle,AIMBOT 360,0x0000_ros_deb,,,,,360 degree aimbot arc from ROS.deb
+aimbot,toggle,AIMBOT 180,0x0000_ros_deb,,,,,180 degree forward aimbot arc from ROS.deb
+visuals,toggle,WALLHACK,0x0000_ros_deb,,,,,DLGMem / LengZz wallhack module from ROS.deb
+memory,toggle,NO RECOIL 100%,0x0000_ros_deb,,,,,Zero recoil memory patch from ROS.deb
+memory,toggle,SPEED,0x0000_ros_deb,,,,,Movement speed patch from ROS.deb
+memory,toggle,SPEED EPIC,0x0000_ros_deb,,,,,High-multiplier speed patch from ROS.deb
+settings,label,MOD HACK,0x0000_ros_deb,,,,,LengZz ROS Hack Header
