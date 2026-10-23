@@ -1263,7 +1263,6 @@ PART 1 - TWEAK.X FUNCTIONS
       - UIWindowDidBecomeKeyNotification
       - UIWindowDidBecomeVisibleNotification
       - UIDeviceOrientationDidChangeNotification
-      - UIWindowSceneDidUpdateCoordinateSpaceNotification (iOS 13+)
       Activation/scene handlers reset gInstallAttempts, then either call
       RAACHEATEnsureOverlayVisible for an existing window or call
       RAACHEATTryInstall. Key/visible handlers ignore Rxaa's own two windows.

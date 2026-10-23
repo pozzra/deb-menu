@@ -1337,19 +1337,6 @@ static void RAACHEATObserveLifecycle(void) {
             }
         }];
         (void)orientationToken;
-
-        if (@available(iOS 13.0, *)) {
-            id coordinateToken = [center addObserverForName:UIWindowSceneDidUpdateCoordinateSpaceNotification
-                                                      object:nil
-                                                       queue:[NSOperationQueue mainQueue]
-                                                  usingBlock:^(NSNotification *note) {
-                (void)note;
-                if (gOverlayWindow) {
-                    RAACHEATEnsureOverlayVisible();
-                }
-            }];
-            (void)coordinateToken;
-        }
     });
 }
 
