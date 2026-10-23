@@ -34,6 +34,7 @@ static NSString *RAACHEATResourcePath(NSString *name) {
     NSFileManager *fm = [NSFileManager defaultManager];
     NSArray<NSString *> *bases = @[
         @"/var/jb/Library/Application Support/RAACHEATMenuDebug",
+        @"/private/var/jb/Library/Application Support/RAACHEATMenuDebug",
         @"/Library/Application Support/RAACHEATMenuDebug"
     ];
     for (NSString *base in bases) {
@@ -48,6 +49,137 @@ static NSString *RAACHEATResourcePath(NSString *name) {
 static NSString *RAACHEATCatalogPath(void) {
     NSString *path = RAACHEATResourcePath(@"index.html");
     return path ? path : @"/Library/Application Support/RAACHEATMenuDebug/index.html";
+}
+
+typedef struct {
+    const char *label;
+    const char *category;
+    const char *kind;
+} RXAAEmbeddedFeature;
+
+static const RXAAEmbeddedFeature kRXAAEmbeddedFeatures[] = {
+    {"AimBot / AimLock Enable", "aimbot", "toggle"},
+    {"Aim FOV Radius", "aimbot", "slider"},
+    {"Aim Lock Distance", "aimbot", "slider"},
+    {"Aim Smooth", "aimbot", "slider"},
+    {"Aim.AutoShoot", "aimbot", "config-key"},
+    {"Aim.AutoShootDistance", "aimbot", "config-key"},
+    {"Aim.Cross", "aimbot", "config-key"},
+    {"Aim.Enable", "aimbot", "config-key"},
+    {"Aim.Fov", "aimbot", "config-key"},
+    {"Aim.IgnoreBot", "aimbot", "config-key"},
+    {"Aim.IgnoreKnocked", "aimbot", "config-key"},
+    {"Aim.InstantAim", "aimbot", "config-key"},
+    {"Aim.MaxDistance", "aimbot", "config-key"},
+    {"Aim.Power", "aimbot", "config-key"},
+    {"Aim.Silent360", "aimbot", "config-key"},
+    {"Aim.SilentAim", "aimbot", "config-key"},
+    {"Aim.SilentDistance", "aimbot", "config-key"},
+    {"Aim.Smooth", "aimbot", "config-key"},
+    {"Aim.TargetBone", "aimbot", "config-key"},
+    {"Aim.TeamCheck", "aimbot", "config-key"},
+    {"Aim.Trigger", "aimbot", "config-key"},
+    {"Aim.VisCheck", "aimbot", "config-key"},
+    {"Aimbot", "aimbot", "label"},
+    {"AUTOLOCK // RADAR TRACK  ", "aimbot", "label"},
+    {"Draw Aim FOV Circle", "aimbot", "toggle"},
+    {"Esp Bone", "aimbot", "label"},
+    {"Follow Hardness (Power)", "aimbot", "label"},
+    {"Ignore Knocked", "aimbot", "toggle"},
+    {"Instant AimLock (Direct Snap)", "aimbot", "toggle"},
+    {"QUANTUM AIM ", "aimbot", "label"},
+    {"Red tracers, white bones, yellow labels and health above the head.", "aimbot", "label"},
+    {"Settings.Unlock120FPS", "aimbot", "config-key"},
+    {"Silent 360", "aimbot", "toggle"},
+    {"Silent Aim (Magic Bullet)", "aimbot", "toggle"},
+    {"Silent Aim Distance", "aimbot", "slider"},
+    {"Target Bone", "aimbot", "combo"},
+    {"TARGET FILTERS", "aimbot", "label"},
+    {"Teammates excluded (always)", "aimbot", "label"},
+    {"Trigger Condition", "aimbot", "combo"},
+    {"Unlock 120 FPS", "aimbot", "label"},
+    {"Video palette: white player tracers, green bot tracers, red/green bones and colored name plates.", "aimbot", "label"},
+    {"Box Color", "visuals", "label"},
+    {"CYBER ESP ", "visuals", "label"},
+    {"Distance", "visuals", "label"},
+    {"Esp Box", "visuals", "label"},
+    {"Esp Count", "visuals", "label"},
+    {"Esp Distance", "visuals", "label"},
+    {"Esp Health", "visuals", "label"},
+    {"ESP Layout", "visuals", "label"},
+    {"Esp Line", "visuals", "label"},
+    {"Esp Name", "visuals", "label"},
+    {"ESP.Alert", "visuals", "config-key"},
+    {"ESP.Bot", "visuals", "config-key"},
+    {"ESP.Box", "visuals", "config-key"},
+    {"ESP.BoxColor.w", "visuals", "config-key"},
+    {"ESP.BoxColor.x", "visuals", "config-key"},
+    {"ESP.BoxColor.y", "visuals", "config-key"},
+    {"ESP.BoxColor.z", "visuals", "config-key"},
+    {"ESP.CrownArrows", "visuals", "config-key"},
+    {"ESP.CrownRing", "visuals", "config-key"},
+    {"ESP.CrownWeapons", "visuals", "config-key"},
+    {"ESP.Distance", "visuals", "config-key"},
+    {"ESP.EnemyOnly", "visuals", "config-key"},
+    {"ESP.Knocked", "visuals", "config-key"},
+    {"ESP.Line", "visuals", "config-key"},
+    {"ESP.LineBelow", "visuals", "config-key"},
+    {"ESP.LineColor.w", "visuals", "config-key"},
+    {"ESP.LineColor.x", "visuals", "config-key"},
+    {"ESP.LineColor.y", "visuals", "config-key"},
+    {"ESP.LineColor.z", "visuals", "config-key"},
+    {"ESP.LinePosition", "visuals", "config-key"},
+    {"ESP.LineThickness", "visuals", "config-key"},
+    {"ESP.MaxDistance", "visuals", "config-key"},
+    {"ESP.Name", "visuals", "config-key"},
+    {"ESP.Skeleton", "visuals", "config-key"},
+    {"ESP.SkeletonColor.w", "visuals", "config-key"},
+    {"ESP.SkeletonColor.x", "visuals", "config-key"},
+    {"ESP.SkeletonColor.y", "visuals", "config-key"},
+    {"ESP.SkeletonColor.z", "visuals", "config-key"},
+    {"ESP.SkeletonDebug", "visuals", "config-key"},
+    {"ESP.Vehicle", "visuals", "config-key"},
+    {"Hide ESP (Screen & Recording)", "visuals", "label"},
+    {"Line Color", "visuals", "label"},
+    {"Line Position", "visuals", "label"},
+    {"RADAR FX", "visuals", "label"},
+    {"Skeleton Color", "visuals", "label"},
+    {"Style Box", "visuals", "label"},
+    {"Vehicle Esp", "visuals", "label"},
+    {"Visuals", "visuals", "label"},
+    {"Memory", "memory", "label"},
+    {"Memory Engine", "memory", "label"},
+    {"RegionSwitchButton", "memory", "label"},
+    {"SELECT SEARCH REGION", "memory", "label"},
+    {"Speed Multiplier", "memory", "label"},
+    {"Speed.Multiplier", "memory", "config-key"},
+    {"CONFIGURATION", "settings", "label"},
+    {"HUD CONFIG & FX ", "settings", "label"},
+    {"LOAD CONFIG", "settings", "label"},
+    {"MenuHeaderClose", "settings", "label"},
+    {"Package", "settings", "label"},
+    {"Runtime", "settings", "label"},
+    {"SAVE PRESET", "settings", "label"},
+    {"Settings", "settings", "label"},
+    {"Settings.HideRecording", "settings", "config-key"},
+    {"Choose the optimal scanning region for your device and game version:", "help", "help"},
+    {"Note: You can switch regions anytime from the top bar.", "help", "help"},
+    {"Select the game memory search region for this session.", "help", "help"},
+    {"Tap to cycle search region: OTHER -> ANONYMOUS -> C_ALLOC", "help", "help"},
+};
+
+static NSArray<NSDictionary *> *RXAAEmbeddedCatalogFeatures(void) {
+    NSUInteger count = (NSUInteger)(sizeof(kRXAAEmbeddedFeatures) / sizeof(kRXAAEmbeddedFeatures[0]));
+    NSMutableArray<NSDictionary *> *result = [NSMutableArray arrayWithCapacity:count];
+    for (NSUInteger i = 0; i < count; i++) {
+        RXAAEmbeddedFeature feature = kRXAAEmbeddedFeatures[i];
+        [result addObject:@{
+            @"label": [NSString stringWithUTF8String:feature.label],
+            @"category": [NSString stringWithUTF8String:feature.category],
+            @"kind": [NSString stringWithUTF8String:feature.kind]
+        }];
+    }
+    return result;
 }
 
 static NSArray<NSString *> *RXAACatalogCategories(void) {
@@ -84,6 +216,13 @@ static NSArray<NSDictionary *> *RXAACatalogFeatures(void) {
                 continue;
             }
             [result addObject:entry];
+        }
+        if (result.count == 0) {
+            NSLog(@"[Rxaa] catalog JSON unavailable at %@; using embedded features", path);
+            result = [RXAAEmbeddedCatalogFeatures() mutableCopy];
+        } else {
+            NSLog(@"[Rxaa] loaded %lu catalog features from %@",
+                  (unsigned long)result.count, path);
         }
         features = [result copy];
     });
@@ -175,6 +314,33 @@ static void RAACHEATRestorePreviousKeyWindow(void) {
     gPreviousKeyWindow = nil;
 }
 
+static void RAACHEATRefreshOverlayBounds(void) {
+    if (!gOverlayWindow) {
+        return;
+    }
+
+    CGRect bounds = CGRectZero;
+    if (@available(iOS 13.0, *)) {
+        UIWindowScene *scene = gOverlayWindow.windowScene;
+        if (scene) {
+            bounds = scene.coordinateSpace.bounds;
+        }
+    }
+    if (CGRectIsEmpty(bounds)) {
+        bounds = [UIScreen mainScreen].bounds;
+    }
+    if (CGRectIsEmpty(bounds)) {
+        return;
+    }
+
+    gOverlayWindow.frame = bounds;
+    UIViewController *root = gOverlayWindow.rootViewController;
+    root.view.frame = gOverlayWindow.bounds;
+    if (gFloatButton) {
+        gFloatButton.frame = CGRectMake(bounds.size.width - 66, 96, 52, 52);
+    }
+}
+
 static void RAACHEATOpenPanel(void) {
     if (!gOverlayWindow) {
         NSLog(@"[Rxaa] open ignored: overlay window is nil");
@@ -201,6 +367,7 @@ static void RAACHEATOpenPanel(void) {
     }
 
     NSLog(@"[Rxaa] opening menu");
+    RAACHEATRefreshOverlayBounds();
     gPreviousKeyWindow = RAACHEATKeyWindowForScene(nil);
     if (gPreviousKeyWindow == gOverlayWindow) {
         gPreviousKeyWindow = nil;
@@ -218,6 +385,9 @@ static void RAACHEATOpenPanel(void) {
     RXAAMenuViewController *menu = [[RXAAMenuViewController alloc] initWithStyle:UITableViewStyleGrouped];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:menu];
     nav.modalPresentationStyle = UIModalPresentationFullScreen;
+    nav.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
+    nav.modalPresentationCapturesStatusBarAppearance = YES;
+    nav.view.backgroundColor = RXAABackground();
     gMenuNav = nav;
     [root presentViewController:nav animated:YES completion:^{
         if (root.presentedViewController != nav) {
@@ -233,6 +403,18 @@ static void RAACHEATOpenPanel(void) {
 - (void)loadView {
     self.view = [[RAACHEATPassThroughView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.view.backgroundColor = [UIColor clearColor];
+}
+
+- (void)viewWillTransitionToSize:(CGSize)size
+       withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
+    [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
+    [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        (void)context;
+        RAACHEATRefreshOverlayBounds();
+    } completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        (void)context;
+        RAACHEATRefreshOverlayBounds();
+    }];
 }
 
 - (void)raacheatOpen {
@@ -413,6 +595,10 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     }
 }
 
+- (BOOL)prefersStatusBarHidden {
+    return YES;
+}
+
 - (UIStatusBarStyle)preferredStatusBarStyle {
     return UIStatusBarStyleLightContent;
 }
@@ -518,6 +704,10 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
     [[NSUserDefaults standardUserDefaults] setBool:sw.isOn forKey:sw.featureKey];
 }
 
+- (BOOL)prefersStatusBarHidden {
+    return YES;
+}
+
 - (UIStatusBarStyle)preferredStatusBarStyle {
     return UIStatusBarStyleLightContent;
 }
@@ -558,6 +748,10 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
         gMenuNav = nil;
         RAACHEATRestorePreviousKeyWindow();
     }];
+}
+
+- (BOOL)prefersStatusBarHidden {
+    return YES;
 }
 
 - (UIStatusBarStyle)preferredStatusBarStyle {

@@ -1,7 +1,7 @@
 RXAA iOS MENU - FUNCTION REFERENCE
 ==================================
 Generated: 2026-10-23
-Updated:   2026-10-23 for Rxaa 1.2.0
+Updated:   2026-10-23 for Rxaa 1.2.1
 Project:   C:\Users\PC\Desktop\Roses-Mod-Menu-master\RAACHEAT_iOS_Menu_Debug
 Primary:   Tweak.x
 Web app:   layout\Library\Application Support\RAACHEATMenuDebug\index.html
@@ -43,7 +43,7 @@ RAACHEATMenuDebug.plist
 control
   Package: com.rxaa.menudebug
   Name: Rxaa
-  Version: 1.2.0
+  Version: 1.2.1
 
 GLOBAL STATE (Tweak.x)
 ----------------------
@@ -91,12 +91,14 @@ STARTUP / CALL FLOW
 7. -raacheatOpen calls RAACHEATOpenPanel.
 8. RAACHEATOpenPanel presents RXAAMenuViewController inside a
    UINavigationController.
-9. The table shows AimLock/ESP/Radar switches, Get Code, Apply All (Demo), and
-   Reset All (Demo).
-10. Tapping Get Code pushes RXAACatalogViewController, which loads
+9. The table shows AimLock/ESP/Radar switches, Get Code, All Features,
+   Apply All (Demo), and Reset All (Demo).
+10. Tapping All Features pushes RXAACatalogFeatureViewController, which uses
+    menu_catalog.json or the embedded 108-entry fallback.
+11. Tapping Get Code pushes RXAACatalogViewController, which loads
     index.html into a WKWebView.
-11. Close dismisses the navigation controller and clears gMenuNav.
-12. UIApplicationDidBecomeActiveNotification and UISceneDidActivateNotification
+12. Close dismisses the navigation controller and clears gMenuNav.
+13. UIApplicationDidBecomeActiveNotification and UISceneDidActivateNotification
     reattach the overlay/gesture or retry installation.
 
 
@@ -188,7 +190,8 @@ PART 1 - TWEAK.X FUNCTIONS
 
    Search order
      1. /var/jb/Library/Application Support/RAACHEATMenuDebug/<name>
-     2. /Library/Application Support/RAACHEATMenuDebug/<name>
+     2. /private/var/jb/Library/Application Support/RAACHEATMenuDebug/<name>
+     3. /Library/Application Support/RAACHEATMenuDebug/<name>
 
    Behavior
      Builds each path with -stringByAppendingPathComponent: and checks it with
@@ -247,16 +250,19 @@ PART 1 - TWEAK.X FUNCTIONS
 
    Behavior
      1. Logs "[Rxaa] opening menu".
-     2. Saves the current app key window in gPreviousKeyWindow via
+     2. Calls RAACHEATRefreshOverlayBounds so the overlay and root view match
+        the current UIWindowScene before presenting.
+     3. Saves the current app key window in gPreviousKeyWindow via
         RAACHEATKeyWindowForScene(nil). If no key window is found, uses the
         first non-overlay app window.
-     3. Calls [gOverlayWindow makeKeyAndVisible] so presentation/touches work
+     4. Calls [gOverlayWindow makeKeyAndVisible] so presentation/touches work
         reliably while the menu is open.
-     4. Creates RXAAMenuViewController with UITableViewStyleGrouped.
-     5. Wraps it in a UINavigationController.
-     6. Sets UIModalPresentationFullScreen.
-     7. Presents it from the overlay window's root controller.
-     8. In the presentation completion, clears gMenuNav and restores the
+     5. Creates RXAAMenuViewController with UITableViewStyleGrouped.
+     6. Wraps it in a UINavigationController.
+     7. Sets UIModalPresentationFullScreen, a cover-vertical transition,
+        status-bar capture, and the Rxaa background color.
+     8. Presents it from the overlay window's root controller.
+     9. In the presentation completion, clears gMenuNav and restores the
         previous key window if the navigation controller did not actually
         become the presented controller.
 
@@ -266,6 +272,29 @@ PART 1 - TWEAK.X FUNCTIONS
 
    Called by
      RAACHEATRootController -raacheatOpen.
+
+6a. RAACHEATRefreshOverlayBounds
+    Signature: static void RAACHEATRefreshOverlayBounds(void)
+    Location: Tweak.x
+
+    Purpose
+      Keep the overlay window, its root view, and the floating button matched
+      to the current scene bounds.
+
+    Behavior
+      - Returns if gOverlayWindow is nil.
+      - Reads gOverlayWindow.windowScene.coordinateSpace.bounds on iOS 13+.
+      - Falls back to [UIScreen mainScreen].bounds.
+      - Sets gOverlayWindow.frame.
+      - Sets the root controller view frame to the window bounds.
+      - Repositions gFloatButton at the top-right if it exists.
+
+    Called by
+      RAACHEATOpenPanel, before presenting the full-screen menu.
+      RAACHEATRootController -viewWillTransitionToSize:withTransitionCoordinator:.
+
+    Side effects
+      Frame changes only. No game memory or process access.
 
 7. RAACHEATRootController -loadView
    Signature: - (void)loadView
@@ -311,6 +340,31 @@ PART 1 - TWEAK.X FUNCTIONS
 
    Side effects
      Presents the Rxaa menu when the guards in RAACHEATOpenPanel pass.
+
+8a. RAACHEATRootController -viewWillTransitionToSize:withTransitionCoordinator:
+    Signature: - (void)viewWillTransitionToSize:(CGSize)size
+                 withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator
+    Location: Tweak.x
+    Class:    RAACHEATRootController
+
+    Purpose
+      Refresh the overlay geometry when the scene rotates or resizes.
+
+    Parameters
+      size        - the new view size.
+      coordinator - the transition coordinator for the rotation/resize.
+
+    Returns
+      void.
+
+    Behavior
+      - Calls super.
+      - Calls RAACHEATRefreshOverlayBounds during the transition animation.
+      - Calls it again in the completion block.
+      - The menu remains UIModalPresentationFullScreen.
+
+    Side effects
+      Updates the overlay window, root view, and floating button frames.
 
 9. RAACHEATRootController -raacheatPan:
    Signature: - (void)raacheatPan:(UIPanGestureRecognizer *)pan
@@ -691,6 +745,10 @@ PART 1 - TWEAK.X FUNCTIONS
     Returns
       UIStatusBarStyleLightContent.
 
+    Related method
+      -prefersStatusBarHidden returns YES. The menu is presented full screen
+      with nav.modalPresentationCapturesStatusBarAppearance = YES.
+
 22. RXAACatalogViewController -viewDidLoad
     Signature: - (void)viewDidLoad
     Location: Tweak.x
@@ -769,6 +827,10 @@ PART 1 - TWEAK.X FUNCTIONS
 
     Returns
       UIStatusBarStyleLightContent.
+
+    Related method
+      -prefersStatusBarHidden returns YES so the full-screen catalog uses the
+      whole display.
 
 26. RAACHEATInstallOverlay
     Signature: static void RAACHEATInstallOverlay(void)
@@ -981,8 +1043,10 @@ PART 1B - CATALOG-DRIVEN FEATURE BROWSER
 ========================================
 These functions/classes load menu_catalog.json and build the "All Features"
 screen. The JSON is read from the installed resource directory, filtered to the
-five feature categories, and displayed as grouped UI-only rows. No game process
-is contacted.
+five feature categories, and displayed as grouped UI-only rows. If the JSON is
+missing, malformed, or empty, an embedded 108-entry feature table is used
+instead, so All Features is not empty in a sandboxed/unreadable-resource case.
+No game process is contacted.
 
 1. RXAACatalogCategories
    Signature: static NSArray<NSString *> *RXAACatalogCategories(void)
@@ -1011,15 +1075,61 @@ is contacted.
      - Reads the top-level "items" array.
      - Keeps dictionaries whose "category" is in RXAACatalogCategories.
      - Requires string values for "category" and "label".
-     - Caches the filtered array with dispatch_once.
+     - If zero features were loaded, logs the missing path and calls
+       RXAAEmbeddedCatalogFeatures for the built-in 108-entry fallback.
+     - Caches the filtered/fallback array with dispatch_once.
 
    Returns
-     The cached feature array, or an empty array if the JSON is missing or
-     malformed.
+     The cached feature array. For this build it contains 108 entries even if
+     the external JSON cannot be read.
 
    Notes
      The screen displays all 108 feature entries: 63 actionable entries
      (config-key/toggle/slider/combo) and 45 read-only label/help entries.
+
+2a. RXAAEmbeddedFeature / kRXAAEmbeddedFeatures
+    Signature: typedef struct {
+                 const char *label;
+                 const char *category;
+                 const char *kind;
+               } RXAAEmbeddedFeature;
+               static const RXAAEmbeddedFeature kRXAAEmbeddedFeatures[];
+    Location: Tweak.x
+
+    Purpose
+      Compile-time copy of the 108 feature labels/categories/kinds used when
+      menu_catalog.json is unavailable.
+
+    Contents
+      - 108 rows: 41 aimbot, 48 visuals, 6 memory, 9 settings, 4 help.
+      - 63 actionable rows and 45 label/help rows.
+      - Only the fields used by the All Features UI are stored; no offsets,
+        xrefs, meta flags, or memory addresses are embedded.
+
+    Notes
+      The table is generated from the same menu_catalog.json feature set. It is
+      intentionally data-only and contains no game code.
+
+2b. RXAAEmbeddedCatalogFeatures
+    Signature: static NSArray<NSDictionary *> *RXAAEmbeddedCatalogFeatures(void)
+    Location: Tweak.x
+
+    Purpose
+      Convert kRXAAEmbeddedFeatures into the same dictionary shape used by
+      RXAACatalogFeatures.
+
+    Behavior
+      - Computes the array count at compile time.
+      - Creates an NSMutableArray with that capacity.
+      - For each row, adds:
+          @{ @"label": ..., @"category": ..., @"kind": ... }.
+      - Returns the mutable array.
+
+    Returns
+      An array of 108 feature dictionaries.
+
+    Used by
+      RXAACatalogFeatures when the external JSON yields zero features.
 
 3. RXAACatalogFeaturesForCategory
    Signature: static NSArray<NSDictionary *> *RXAACatalogFeaturesForCategory(NSString *category)
@@ -1206,6 +1316,10 @@ is contacted.
 
     Returns
       UIStatusBarStyleLightContent.
+
+    Related method
+      -prefersStatusBarHidden returns YES so the full-screen feature list uses
+      the whole display.
 
 
 PART 2 - INDEX.HTML JAVASCRIPT FUNCTIONS
@@ -1428,10 +1542,10 @@ build_deb.sh
 EXPECTED OUTPUT
 ---------------
 Rootful:
-  packages/com.rxaa.menudebug_1.2.0_iphoneos-arm.deb
+  packages/com.rxaa.menudebug_1.2.1_iphoneos-arm.deb
 
 Rootless:
-  packages/com.rxaa.menudebug_1.2.0_iphoneos-arm64.deb
+  packages/com.rxaa.menudebug_1.2.1_iphoneos-arm64.deb
   (actual name may vary with Theos packaging scheme)
 
 INSTALL TARGETS

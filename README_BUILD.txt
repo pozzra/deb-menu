@@ -6,10 +6,12 @@ WHAT THIS IS
 A Theos tweak project named Rxaa. It adds a small floating icon button to apps.
 Tapping it opens a native Rxaa list with AimLock/ESP/Radar demo switches, a
 "Get Code" row, an "All Features" browser, and Apply All / Reset All demo
-actions. All Features reads menu_catalog.json and lists the 108 catalog feature
-entries grouped by category; actionable entries have UI-only switches. Get Code
-opens the offline WebKit browser containing the menu-name/code catalog. The
-button icon is generated from menu_image.jpg.
+actions. All Features prefers menu_catalog.json, falls back to an embedded
+108-entry feature table if the JSON cannot be read, and lists the entries
+grouped by category; actionable entries have UI-only switches. Get Code opens
+the offline WebKit browser containing the menu-name/code catalog. The menu is
+presented full screen and refreshes its overlay bounds when the scene rotates
+or resizes. The button icon is generated from menu_image.jpg.
 
 The switches are UI-only. They save ON/OFF in NSUserDefaults and update the
 label; they do not hook, read, or write any game process.
@@ -51,7 +53,7 @@ Option A: macOS or Linux with Theos
        export THEOS=$HOME/theos
        make clean package FINALPACKAGE=1
   3. The .deb appears in ./packages/ (normally
-     com.rxaa.menudebug_1.2.0_iphoneos-arm.deb).
+     com.rxaa.menudebug_1.2.1_iphoneos-arm.deb).
   4. Install it on a jailbroken device with Filza, Sileo, or:
        dpkg -i packages/*.deb
        killall -9 SpringBoard
@@ -79,8 +81,12 @@ INSTALL NOTES
   This opens Rxaa even if the floating button is covered or off-screen.
 - The AimLock switch is a visual demo. It is ON/OFF only for the menu; there is
   no aimbot, memory write, or game hook behind it.
-- All Features lists the 108 feature entries from menu_catalog.json: 63
-  actionable rows have UI-only switches, and 45 label/help rows are read-only.
+- All Features lists the 108 feature entries from menu_catalog.json, or the
+  embedded fallback copy if the JSON is missing/unreadable: 63 actionable rows
+  have UI-only switches, and 45 label/help rows are read-only.
+- The menu is forced to UIModalPresentationFullScreen. If the device rotates or
+  the scene resizes, the overlay window, root view, and floating button bounds
+  are refreshed.
 - Install the artifact that matches the jailbreak:
     * rootful jailbreak -> Rxaa-rootful-deb
     * rootless jailbreak (Dopamine/palera1n) -> Rxaa-rootless-deb
