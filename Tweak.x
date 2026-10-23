@@ -5,12 +5,22 @@
 // memory access, aimbot, ESP, or offset code.
 
 static UIWindow *gOverlayWindow = nil;
+static UIWindow *gButtonWindow = nil;
 static UIButton *gFloatButton = nil;
 static UINavigationController *gMenuNav = nil;
 static UITapGestureRecognizer *gOpenGesture = nil;
 static UIWindow *gGestureWindow = nil;
 static UIWindow *gPreviousKeyWindow = nil;
 static int gInstallAttempts = 0;
+
+static CGFloat const kRXAAFloatButtonSize = 52.0;
+static CGFloat const kRXAAFloatButtonMargin = 10.0;
+static NSString * const kRXAAFloatCenterXKey = @"rxaa.float.centerX";
+static NSString * const kRXAAFloatCenterYKey = @"rxaa.float.centerY";
+static CGPoint gButtonPanStartCenter = CGPointZero;
+static CGPoint gButtonPanStartPoint = CGPointZero;
+
+static void RAACHEATAttachWindowToScene(void);
 
 @interface RAACHEATPassThroughView : UIView
 @end
@@ -284,6 +294,10 @@ static BOOL RXAACatalogFeatureIsActionable(NSDictionary *item) {
 
 @interface RAACHEATRootController : UIViewController <UIGestureRecognizerDelegate>
 - (void)raacheatOpen;
+@end
+
+@interface RAACHEATButtonController : UIViewController
+- (void)raacheatOpen;
 - (void)raacheatPan:(UIPanGestureRecognizer *)pan;
 @end
 
@@ -315,9 +329,143 @@ static UIWindow *RAACHEATKeyWindowForScene(UIWindowScene *scene) {
     return nil;
 }
 
+static CGRect RAACHEATScreenBounds(void) {
+    if (@available(iOS 13.0, *)) {
+        UIWindowScene *scene = gOverlayWindow.windowScene;
+        if (scene) {
+            CGRect bounds = scene.coordinateSpace.bounds;
+            if (!CGRectIsEmpty(bounds)) {
+                return bounds;
+            }
+        }
+    }
+    return [UIScreen mainScreen].bounds;
+}
+
+static UIEdgeInsets RAACHEATScreenSafeInsets(void) {
+    if (@available(iOS 11.0, *)) {
+        UIWindow *key = RAACHEATKeyWindowForScene(nil);
+        if (key && key != gOverlayWindow && key != gButtonWindow) {
+            return key.safeAreaInsets;
+        }
+        for (UIWindow *window in [UIApplication sharedApplication].windows) {
+            if (window != gOverlayWindow && window != gButtonWindow && !window.hidden) {
+                return window.safeAreaInsets;
+            }
+        }
+    }
+    return UIEdgeInsetsZero;
+}
+
+static CGPoint RAACHEATClampFloatButtonCenter(CGPoint center) {
+    CGRect screen = RAACHEATScreenBounds();
+    if (CGRectIsEmpty(screen)) {
+        return center;
+    }
+    UIEdgeInsets insets = RAACHEATScreenSafeInsets();
+    CGFloat half = kRXAAFloatButtonSize * 0.5;
+    CGFloat minX = screen.origin.x + insets.left + kRXAAFloatButtonMargin + half;
+    CGFloat maxX = screen.origin.x + screen.size.width - insets.right -
+                   kRXAAFloatButtonMargin - half;
+    CGFloat minY = screen.origin.y + insets.top + kRXAAFloatButtonMargin + half;
+    CGFloat maxY = screen.origin.y + screen.size.height - insets.bottom -
+                   kRXAAFloatButtonMargin - half;
+
+    if (maxX < minX) {
+        minX = maxX = CGRectGetMidX(screen);
+    }
+    if (maxY < minY) {
+        minY = maxY = CGRectGetMidY(screen);
+    }
+
+    center.x = MAX(minX, MIN(maxX, center.x));
+    center.y = MAX(minY, MIN(maxY, center.y));
+    return center;
+}
+
+static void RAACHEATSaveFloatButtonPosition(void) {
+    if (!gButtonWindow) {
+        return;
+    }
+    CGRect screen = RAACHEATScreenBounds();
+    if (CGRectIsEmpty(screen)) {
+        return;
+    }
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    CGFloat x = (gButtonWindow.center.x - screen.origin.x) / screen.size.width;
+    CGFloat y = (gButtonWindow.center.y - screen.origin.y) / screen.size.height;
+    [defaults setDouble:x forKey:kRXAAFloatCenterXKey];
+    [defaults setDouble:y forKey:kRXAAFloatCenterYKey];
+}
+
+static void RAACHEATRestoreFloatButtonPosition(void) {
+    if (!gButtonWindow) {
+        return;
+    }
+    CGRect screen = RAACHEATScreenBounds();
+    if (CGRectIsEmpty(screen)) {
+        return;
+    }
+
+    UIEdgeInsets insets = RAACHEATScreenSafeInsets();
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSNumber *savedX = [defaults objectForKey:kRXAAFloatCenterXKey];
+    NSNumber *savedY = [defaults objectForKey:kRXAAFloatCenterYKey];
+    CGPoint center = CGPointZero;
+
+    if (savedX && savedY) {
+        center.x = screen.origin.x + (CGFloat)[savedX doubleValue] * screen.size.width;
+        center.y = screen.origin.y + (CGFloat)[savedY doubleValue] * screen.size.height;
+    } else {
+        center.x = screen.origin.x + screen.size.width - insets.right -
+                   kRXAAFloatButtonMargin - (kRXAAFloatButtonSize * 0.5);
+        center.y = screen.origin.y + insets.top + kRXAAFloatButtonMargin + 92.0 +
+                   (kRXAAFloatButtonSize * 0.5);
+    }
+
+    CGRect frame = gButtonWindow.frame;
+    frame.size = CGSizeMake(kRXAAFloatButtonSize, kRXAAFloatButtonSize);
+    gButtonWindow.frame = frame;
+    UIView *buttonView = gButtonWindow.rootViewController.view;
+    if (buttonView) {
+        buttonView.frame = CGRectMake(0.0, 0.0,
+                                      kRXAAFloatButtonSize, kRXAAFloatButtonSize);
+        if (gFloatButton) {
+            gFloatButton.frame = buttonView.bounds;
+        }
+    }
+    gButtonWindow.center = RAACHEATClampFloatButtonCenter(center);
+}
+
 static void RAACHEATRestorePreviousKeyWindow(void) {
-    if (gPreviousKeyWindow && gPreviousKeyWindow != gOverlayWindow) {
-        [gPreviousKeyWindow makeKeyWindow];
+    if (gOverlayWindow) {
+        gOverlayWindow.hidden = YES;
+    }
+    if (gButtonWindow) {
+        gButtonWindow.hidden = NO;
+        gButtonWindow.windowLevel = UIWindowLevelAlert + 101.0;
+        RAACHEATRestoreFloatButtonPosition();
+    }
+
+    UIWindow *target = gPreviousKeyWindow;
+    if (!target || target == gOverlayWindow || target == gButtonWindow || target.hidden) {
+        target = RAACHEATKeyWindowForScene(nil);
+        if (target == gOverlayWindow || target == gButtonWindow || target.hidden) {
+            target = nil;
+        }
+    }
+    if (!target) {
+        for (UIWindow *window in [UIApplication sharedApplication].windows) {
+            if (window != gOverlayWindow && window != gButtonWindow && !window.hidden) {
+                target = window;
+                break;
+            }
+        }
+    }
+    if (target) {
+        [target makeKeyWindow];
+    } else if (gOverlayWindow) {
+        [gOverlayWindow resignKeyWindow];
     }
     gPreviousKeyWindow = nil;
 }
@@ -344,8 +492,8 @@ static void RAACHEATRefreshOverlayBounds(void) {
     gOverlayWindow.frame = bounds;
     UIViewController *root = gOverlayWindow.rootViewController;
     root.view.frame = gOverlayWindow.bounds;
-    if (gFloatButton) {
-        gFloatButton.frame = CGRectMake(bounds.size.width - 66, 96, 52, 52);
+    if (gButtonWindow) {
+        RAACHEATRestoreFloatButtonPosition();
     }
 }
 
@@ -375,16 +523,20 @@ static void RAACHEATOpenPanel(void) {
     }
 
     NSLog(@"[Rxaa] opening menu");
+    RAACHEATAttachWindowToScene();
     RAACHEATRefreshOverlayBounds();
     gOverlayWindow.hidden = NO;
     gOverlayWindow.windowLevel = UIWindowLevelAlert + 100.0;
+    if (gButtonWindow) {
+        gButtonWindow.hidden = YES;
+    }
     gPreviousKeyWindow = RAACHEATKeyWindowForScene(nil);
-    if (gPreviousKeyWindow == gOverlayWindow) {
+    if (gPreviousKeyWindow == gOverlayWindow || gPreviousKeyWindow == gButtonWindow) {
         gPreviousKeyWindow = nil;
     }
     if (!gPreviousKeyWindow) {
         for (UIWindow *window in [UIApplication sharedApplication].windows) {
-            if (window != gOverlayWindow) {
+            if (window != gOverlayWindow && window != gButtonWindow) {
                 gPreviousKeyWindow = window;
                 break;
             }
@@ -431,16 +583,70 @@ static void RAACHEATOpenPanel(void) {
     RAACHEATOpenPanel();
 }
 
-- (void)raacheatPan:(UIPanGestureRecognizer *)pan {
-    UIView *view = pan.view;
-    CGPoint translation = [pan translationInView:view.superview];
-    view.center = CGPointMake(view.center.x + translation.x, view.center.y + translation.y);
-    [pan setTranslation:CGPointZero inView:view.superview];
-}
-
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
     shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
     return YES;
+}
+
+@end
+
+@implementation RAACHEATButtonController
+
+- (void)loadView {
+    self.view = [[UIView alloc] initWithFrame:CGRectMake(0.0, 0.0,
+                                                         kRXAAFloatButtonSize,
+                                                         kRXAAFloatButtonSize)];
+    self.view.backgroundColor = [UIColor clearColor];
+    self.view.clipsToBounds = NO;
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if (gFloatButton) {
+        gFloatButton.frame = self.view.bounds;
+    }
+}
+
+- (void)raacheatOpen {
+    RAACHEATOpenPanel();
+}
+
+- (void)raacheatPan:(UIPanGestureRecognizer *)pan {
+    if (!gButtonWindow) {
+        return;
+    }
+
+    UIView *reference = gOverlayWindow ?: self.view;
+    if (pan.state == UIGestureRecognizerStateBegan) {
+        gButtonPanStartCenter = gButtonWindow.center;
+        gButtonPanStartPoint = [pan locationInView:reference];
+        gButtonWindow.hidden = NO;
+        [UIView animateWithDuration:0.12
+                              delay:0.0
+                            options:UIViewAnimationOptionBeginFromCurrentState |
+                                    UIViewAnimationOptionAllowUserInteraction
+                         animations:^{
+            gFloatButton.alpha = 0.82;
+        } completion:nil];
+    } else if (pan.state == UIGestureRecognizerStateChanged) {
+        CGPoint point = [pan locationInView:reference];
+        CGPoint center = CGPointMake(
+            gButtonPanStartCenter.x + (point.x - gButtonPanStartPoint.x),
+            gButtonPanStartCenter.y + (point.y - gButtonPanStartPoint.y));
+        gButtonWindow.center = RAACHEATClampFloatButtonCenter(center);
+    } else if (pan.state == UIGestureRecognizerStateEnded ||
+               pan.state == UIGestureRecognizerStateCancelled ||
+               pan.state == UIGestureRecognizerStateFailed) {
+        gButtonWindow.center = RAACHEATClampFloatButtonCenter(gButtonWindow.center);
+        RAACHEATSaveFloatButtonPosition();
+        [UIView animateWithDuration:0.15
+                              delay:0.0
+                            options:UIViewAnimationOptionBeginFromCurrentState |
+                                    UIViewAnimationOptionAllowUserInteraction
+                         animations:^{
+            gFloatButton.alpha = 1.0;
+        } completion:nil];
+    }
 }
 
 @end
@@ -487,6 +693,14 @@ static NSArray<NSString *> *RXAAFeatureKeys(void) {
         gMenuNav = nil;
         RAACHEATRestorePreviousKeyWindow();
     }];
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    if (self.isBeingDismissed || self.navigationController.isBeingDismissed) {
+        gMenuNav = nil;
+        RAACHEATRestorePreviousKeyWindow();
+    }
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
@@ -818,13 +1032,13 @@ static UIWindowScene *RAACHEATActiveWindowScene(void) {
 static UIWindow *RAACHEATHostWindow(UIWindowScene *scene) {
     UIApplication *app = [UIApplication sharedApplication];
     UIWindow *keyWindow = RAACHEATKeyWindowForScene(scene);
-    if (keyWindow && keyWindow != gOverlayWindow) {
+    if (keyWindow && keyWindow != gOverlayWindow && keyWindow != gButtonWindow) {
         return keyWindow;
     }
     if (scene) {
         UIWindow *fallback = nil;
         for (UIWindow *window in scene.windows) {
-            if (window == gOverlayWindow) {
+            if (window == gOverlayWindow || window == gButtonWindow) {
                 continue;
             }
             if (!window.hidden) {
@@ -839,7 +1053,7 @@ static UIWindow *RAACHEATHostWindow(UIWindowScene *scene) {
         }
     }
     for (UIWindow *window in app.windows) {
-        if (window != gOverlayWindow) {
+        if (window != gOverlayWindow && window != gButtonWindow) {
             return window;
         }
     }
@@ -881,14 +1095,29 @@ static void RAACHEATAttachWindowToScene(void) {
         if (gOverlayWindow.windowScene != scene) {
             gOverlayWindow.windowScene = scene;
         }
+        if (gButtonWindow.windowScene != scene) {
+            gButtonWindow.windowScene = scene;
+        }
         CGRect bounds = scene.coordinateSpace.bounds;
         if (!CGRectIsEmpty(bounds)) {
             gOverlayWindow.frame = bounds;
         }
-        gOverlayWindow.hidden = NO;
         UIViewController *root = gOverlayWindow.rootViewController;
         root.view.frame = gOverlayWindow.bounds;
         RAACHEATInstallOpenGesture((RAACHEATRootController *)root, scene);
+    }
+
+    gOverlayWindow.windowLevel = UIWindowLevelAlert + 100.0;
+    if (gButtonWindow) {
+        gButtonWindow.windowLevel = UIWindowLevelAlert + 101.0;
+        if (gMenuNav) {
+            gOverlayWindow.hidden = NO;
+            gButtonWindow.hidden = YES;
+        } else {
+            gOverlayWindow.hidden = YES;
+            gButtonWindow.hidden = NO;
+            RAACHEATRestoreFloatButtonPosition();
+        }
     }
 }
 
@@ -897,17 +1126,19 @@ static void RAACHEATEnsureOverlayVisible(void) {
         return;
     }
 
-    BOOL wasHidden = gOverlayWindow.hidden;
     RAACHEATAttachWindowToScene();
-    gOverlayWindow.hidden = NO;
-    gOverlayWindow.windowLevel = UIWindowLevelAlert + 100.0;
 
     if (gMenuNav) {
+        gOverlayWindow.hidden = NO;
+        if (gButtonWindow) {
+            gButtonWindow.hidden = YES;
+        }
         [gOverlayWindow makeKeyAndVisible];
-    }
-
-    if (wasHidden) {
-        NSLog(@"[Rxaa] overlay re-shown");
+    } else {
+        gOverlayWindow.hidden = YES;
+        if (gButtonWindow) {
+            gButtonWindow.hidden = NO;
+        }
     }
 }
 
@@ -947,16 +1178,17 @@ static void RAACHEATInstallOverlay(void) {
     gOverlayWindow.windowLevel = UIWindowLevelAlert + 100.0;
     gOverlayWindow.backgroundColor = [UIColor clearColor];
     gOverlayWindow.rootViewController = [[RAACHEATRootController alloc] init];
-    gOverlayWindow.hidden = NO;
+    gOverlayWindow.hidden = YES;
 
     RAACHEATRootController *root = (RAACHEATRootController *)gOverlayWindow.rootViewController;
     root.view.frame = bounds;
 
     gFloatButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    gFloatButton.frame = CGRectMake(bounds.size.width - 66, 96, 52, 52);
-    gFloatButton.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleBottomMargin;
+    gFloatButton.frame = CGRectMake(0.0, 0.0,
+                                    kRXAAFloatButtonSize, kRXAAFloatButtonSize);
+    gFloatButton.autoresizingMask = UIViewAutoresizingNone;
     gFloatButton.backgroundColor = [UIColor colorWithRed:0.06 green:0.13 blue:0.10 alpha:0.94];
-    gFloatButton.layer.cornerRadius = 26.0;
+    gFloatButton.layer.cornerRadius = kRXAAFloatButtonSize * 0.5;
     gFloatButton.layer.borderWidth = 1.0;
     gFloatButton.layer.borderColor = [UIColor colorWithRed:0.31 green:0.94 blue:0.65 alpha:0.85].CGColor;
     gFloatButton.clipsToBounds = YES;
@@ -974,13 +1206,40 @@ static void RAACHEATInstallOverlay(void) {
         [gFloatButton setTitleColor:RXAAGreen() forState:UIControlStateNormal];
         gFloatButton.titleLabel.font = [UIFont monospacedSystemFontOfSize:22 weight:UIFontWeightBold];
     }
-    [gFloatButton addTarget:root action:@selector(raacheatOpen) forControlEvents:UIControlEventTouchUpInside];
 
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:root action:@selector(raacheatPan:)];
-    pan.cancelsTouchesInView = NO;
+    RAACHEATButtonController *buttonRoot = [[RAACHEATButtonController alloc] init];
+    if (@available(iOS 13.0, *)) {
+        if (scene) {
+            gButtonWindow = [[UIWindow alloc] initWithWindowScene:scene];
+        }
+    }
+    if (!gButtonWindow) {
+        gButtonWindow = [[UIWindow alloc] initWithFrame:CGRectMake(0.0, 0.0,
+                                                                   kRXAAFloatButtonSize,
+                                                                   kRXAAFloatButtonSize)];
+    }
+    gButtonWindow.frame = CGRectMake(0.0, 0.0,
+                                     kRXAAFloatButtonSize, kRXAAFloatButtonSize);
+    gButtonWindow.windowLevel = UIWindowLevelAlert + 101.0;
+    gButtonWindow.backgroundColor = [UIColor clearColor];
+    gButtonWindow.rootViewController = buttonRoot;
+    gButtonWindow.hidden = NO;
+    gFloatButton.frame = buttonRoot.view.bounds;
+    [buttonRoot.view addSubview:gFloatButton];
+
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
+        initWithTarget:buttonRoot action:@selector(raacheatPan:)];
+    pan.cancelsTouchesInView = YES;
+    pan.maximumNumberOfTouches = 1;
     [gFloatButton addGestureRecognizer:pan];
 
-    [root.view addSubview:gFloatButton];
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
+        initWithTarget:buttonRoot action:@selector(raacheatOpen)];
+    tap.numberOfTapsRequired = 1;
+    tap.cancelsTouchesInView = NO;
+    [gFloatButton addGestureRecognizer:tap];
+
+    RAACHEATRestoreFloatButtonPosition();
     RAACHEATInstallOpenGesture(root, scene);
     NSLog(@"[Rxaa] overlay installed scene=%@ bounds=%@", scene, NSStringFromCGRect(bounds));
 }
@@ -1046,7 +1305,7 @@ static void RAACHEATObserveLifecycle(void) {
                 return;
             }
             if ([note.object isKindOfClass:[UIWindow class]] &&
-                note.object == gOverlayWindow) {
+                (note.object == gOverlayWindow || note.object == gButtonWindow)) {
                 return;
             }
             RAACHEATEnsureOverlayVisible();
@@ -1061,12 +1320,36 @@ static void RAACHEATObserveLifecycle(void) {
                 return;
             }
             if ([note.object isKindOfClass:[UIWindow class]] &&
-                note.object == gOverlayWindow) {
+                (note.object == gOverlayWindow || note.object == gButtonWindow)) {
                 return;
             }
             RAACHEATEnsureOverlayVisible();
         }];
         (void)visibleToken;
+
+        id orientationToken = [center addObserverForName:UIDeviceOrientationDidChangeNotification
+                                                  object:nil
+                                                   queue:[NSOperationQueue mainQueue]
+                                              usingBlock:^(NSNotification *note) {
+            (void)note;
+            if (gOverlayWindow) {
+                RAACHEATEnsureOverlayVisible();
+            }
+        }];
+        (void)orientationToken;
+
+        if (@available(iOS 13.0, *)) {
+            id coordinateToken = [center addObserverForName:UIWindowSceneDidUpdateCoordinateSpaceNotification
+                                                      object:nil
+                                                       queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification *note) {
+                (void)note;
+                if (gOverlayWindow) {
+                    RAACHEATEnsureOverlayVisible();
+                }
+            }];
+            (void)coordinateToken;
+        }
     });
 }
 

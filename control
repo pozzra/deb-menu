@@ -1,6 +1,6 @@
 Package: com.rxaa.menudebug
 Name: Rxaa
-Version: 1.2.4
+Version: 1.2.5
 Architecture: iphoneos-arm
 Description: Rxaa UI demo menu with ROS.deb & RAACHEAT features, Python config generator. Telegram: @kun_amra.
 Maintainer: @kun_amra

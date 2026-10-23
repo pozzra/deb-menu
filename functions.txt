@@ -1,7 +1,7 @@
 RXAA iOS MENU - FUNCTION REFERENCE
 ==================================
 Generated: 2026-10-23
-Updated:   2026-10-23 for Rxaa 1.2.4
+Updated:   2026-10-23 for Rxaa 1.2.5
 Project:   C:\Users\PC\Desktop\Roses-Mod-Menu-master\RAACHEAT_iOS_Menu_Debug
 Primary:   Tweak.x
 Web app:   layout\Library\Application Support\RAACHEATMenuDebug\index.html
@@ -43,18 +43,24 @@ RAACHEATMenuDebug.plist
 control
   Package: com.rxaa.menudebug
   Name: Rxaa
-  Version: 1.2.4
+  Version: 1.2.5
 
 GLOBAL STATE (Tweak.x)
 ----------------------
 gOverlayWindow
-  The transparent UIWindow at UIWindowLevelAlert + 100 that hosts the floating
-  button. Created once per process by RAACHEATInstallOverlay. It is raised again
-  when the app/scene activates or another window becomes key/visible.
+  The full-screen UIWindow at UIWindowLevelAlert + 100 that hosts the Rxaa menu.
+  Created once per process by RAACHEATInstallOverlay. It is hidden whenever the
+  menu is closed, so it cannot intercept game touches outside the button.
+
+gButtonWindow
+  A separate 52x52 UIWindow at UIWindowLevelAlert + 101 that hosts only the
+  floating button. While the menu is closed this is the only Rxaa window that
+  is visible, so the game remains clickable everywhere except the button.
 
 gFloatButton
   The 52x52 draggable button. Uses menu_icon.png/menu_image.jpg as its
-  background image, or the letter "R" if no icon file is found.
+  background image, or the letter "R" if no icon file is found. Its position is
+  saved in NSUserDefaults and clamped to the screen safe area.
 
 gMenuNav
   The currently presented UINavigationController containing the Rxaa list.
@@ -85,11 +91,12 @@ STARTUP / CALL FLOW
 3. RAACHEATTryInstall calls RAACHEATInstallOverlay.
 4. RAACHEATInstallOverlay waits for an active UIWindowScene. It uses a legacy
    window fallback only when the app already has windows but no scene.
-5. It creates RAACHEATRootController, adds the floating button, and installs the
+5. It creates RAACHEATRootController for the full-screen menu, a separate
+   RAACHEATButtonController in a 52x52 button window, and installs the
    four-finger triple-tap fallback gesture on the host window.
-6. Tapping the button (or using the fallback gesture) sends -raacheatOpen to
-   RAACHEATRootController.
-7. -raacheatOpen calls RAACHEATOpenPanel.
+6. Tapping the button sends -raacheatOpen to RAACHEATButtonController; the
+   fallback gesture sends -raacheatOpen to RAACHEATRootController.
+7. Both -raacheatOpen methods call RAACHEATOpenPanel.
 8. RAACHEATOpenPanel presents RXAAMenuViewController inside a
    UINavigationController.
 9. The table shows AimLock/ESP/Radar switches, Get Code, All Features,
@@ -100,10 +107,12 @@ STARTUP / CALL FLOW
     index.html into a WKWebView.
 12. Tapping Python Engine shows terminal instructions for mod_menu.py; tapping
     Telegram opens https://t.me/kun_amra.
-13. Close dismisses the navigation controller and clears gMenuNav.
+13. Close dismisses the navigation controller, clears gMenuNav, hides the
+    full-screen overlay, restores the game key window, and re-shows the button.
 14. UIApplicationDidBecomeActiveNotification, UISceneDidActivateNotification,
     UIWindowDidBecomeKeyNotification, and UIWindowDidBecomeVisibleNotification
-    re-show/raise the overlay or retry installation.
+    reattach the windows, keep the button visible while the menu is closed, and
+    re-key only the full-screen menu while it is open.
 
 
 PART 1 - TWEAK.X FUNCTIONS
@@ -115,9 +124,10 @@ PART 1 - TWEAK.X FUNCTIONS
    Class:    RAACHEATPassThroughView
 
    Purpose
-     Make the overlay window transparent to touches outside the floating
-     button. The overlay window covers the whole screen; without this, it
-     could swallow every touch intended for the app underneath.
+     Keep the full-screen overlay from swallowing touches if it is visible.
+     The floating button now lives in its own 52x52 window, and the full-screen
+     overlay is hidden while the menu is closed. This view remains as a safety
+     fallback and lets the overlay pass through empty touches.
 
    Parameters
      point - touch point in the view's coordinate system.
@@ -125,13 +135,13 @@ PART 1 - TWEAK.X FUNCTIONS
 
    Returns
      nil when the hit view is the root view itself.
-     The actual subview when the touch lands on the button (or another
-     interactive subview).
+     The actual subview when the touch lands on the presented menu or another
+     interactive subview.
 
    Behavior
      Calls [super hitTest:withEvent:]. If the result is self, returns nil;
-     otherwise returns the subview. This is what lets the app receive touches
-     outside the floating icon.
+     otherwise returns the subview. This keeps empty overlay areas from
+     swallowing touches while the menu is open.
 
    Side effects
      None.
@@ -255,36 +265,40 @@ PART 1 - TWEAK.X FUNCTIONS
    Behavior
      1. Logs "[Rxaa] opening menu".
      2. Calls RAACHEATRefreshOverlayBounds so the overlay and root view match
-        the current UIWindowScene, sets hidden = NO, and raises the window to
-        UIWindowLevelAlert + 100 before presenting.
+        the current UIWindowScene, then shows the overlay at
+        UIWindowLevelAlert + 100 and hides the small button window before
+        presenting.
      3. Saves the current app key window in gPreviousKeyWindow via
         RAACHEATKeyWindowForScene(nil). If no key window is found, uses the
-        first non-overlay app window.
+        first non-overlay, non-button app window.
      4. Calls [gOverlayWindow makeKeyAndVisible] so presentation/touches work
-        reliably while the menu is open.
+        reliably while the menu is open. The button window stays hidden.
      5. Creates RXAAMenuViewController with UITableViewStyleGrouped.
      6. Wraps it in a UINavigationController.
      7. Sets UIModalPresentationFullScreen, a cover-vertical transition,
         status-bar capture, and the Rxaa background color.
      8. Presents it from the overlay window's root controller.
-     9. In the presentation completion, clears gMenuNav and restores the
-        previous key window if the navigation controller did not actually
-        become the presented controller.
+     9. In the presentation completion, clears gMenuNav, hides the overlay,
+        restores the previous key window, and re-shows the button if the
+        navigation controller did not actually become the presented
+        controller.
 
    Side effects
      Sets gMenuNav to the new navigation controller. The controller is
-     dismissed later by -closeMenu, which restores the previous key window.
+     dismissed later by -closeMenu, which hides the full-screen overlay,
+     restores the game key window, and shows the button window again.
 
    Called by
-     RAACHEATRootController -raacheatOpen.
+     RAACHEATButtonController -raacheatOpen (floating button tap) and
+     RAACHEATRootController -raacheatOpen (four-finger fallback gesture).
 
 6a. RAACHEATRefreshOverlayBounds
     Signature: static void RAACHEATRefreshOverlayBounds(void)
     Location: Tweak.x
 
     Purpose
-      Keep the overlay window, its root view, and the floating button matched
-      to the current scene bounds.
+      Keep the full-screen overlay, its root view, and the separate floating
+      button window matched to the current scene bounds.
 
     Behavior
       - Returns if gOverlayWindow is nil.
@@ -292,7 +306,9 @@ PART 1 - TWEAK.X FUNCTIONS
       - Falls back to [UIScreen mainScreen].bounds.
       - Sets gOverlayWindow.frame.
       - Sets the root controller view frame to the window bounds.
-      - Repositions gFloatButton at the top-right if it exists.
+      - Restores the saved button-window center, clamped to the safe area.
+      - Does not change whether the overlay is hidden; the button window remains
+        the only visible Rxaa window while the menu is closed.
 
     Called by
       RAACHEATOpenPanel, before presenting the full-screen menu.
@@ -300,6 +316,93 @@ PART 1 - TWEAK.X FUNCTIONS
 
     Side effects
       Frame changes only. No game memory or process access.
+
+6b. RAACHEATScreenBounds
+    Signature: static CGRect RAACHEATScreenBounds(void)
+    Location: Tweak.x
+
+    Purpose
+      Return the current scene bounds, or the main screen bounds on older apps.
+
+    Returns
+      gOverlayWindow.windowScene.coordinateSpace.bounds when available and
+      non-empty; otherwise [UIScreen mainScreen].bounds.
+
+    Notes
+      Used for button dragging, position restoring, and clamping.
+
+6c. RAACHEATScreenSafeInsets
+    Signature: static UIEdgeInsets RAACHEATScreenSafeInsets(void)
+    Location: Tweak.x
+
+    Purpose
+      Find the safe-area insets of the current game/host window so the floating
+      button can avoid the notch and home indicator.
+
+    Returns
+      The key/host window safeAreaInsets on iOS 11+, or UIEdgeInsetsZero.
+
+    Notes
+      Skips gOverlayWindow and gButtonWindow so Rxaa's own geometry does not
+      define the safe area.
+
+6d. RAACHEATClampFloatButtonCenter
+    Signature: static CGPoint RAACHEATClampFloatButtonCenter(CGPoint center)
+    Location: Tweak.x
+
+    Purpose
+      Keep the 52x52 floating button fully inside the usable screen area.
+
+    Parameters
+      center - proposed button-window center in screen coordinates.
+
+    Returns
+      The clamped center.
+
+    Behavior
+      Applies kRXAAFloatButtonMargin plus the safe-area insets. Falls back to
+      the screen midpoint if the usable area is smaller than the button.
+
+6e. RAACHEATSaveFloatButtonPosition
+    Signature: static void RAACHEATSaveFloatButtonPosition(void)
+    Location: Tweak.x
+
+    Purpose
+      Persist the button position as normalized screen coordinates.
+
+    Behavior
+      Stores x/y fractions in NSUserDefaults under rxaa.float.centerX and
+      rxaa.float.centerY. The values are normalized to the current screen
+      bounds so rotation and different device sizes keep the button in a
+      sensible place.
+
+6f. RAACHEATRestoreFloatButtonPosition
+    Signature: static void RAACHEATRestoreFloatButtonPosition(void)
+    Location: Tweak.x
+
+    Purpose
+      Place the button window at its saved position, or at the default top-right
+      position on first launch.
+
+    Behavior
+      Reads the normalized NSUserDefaults values, converts them to screen
+      coordinates, and clamps them with RAACHEATClampFloatButtonCenter. If no
+      saved value exists, uses the top-right safe-area position.
+
+6g. RAACHEATRestorePreviousKeyWindow
+    Signature: static void RAACHEATRestorePreviousKeyWindow(void)
+    Location: Tweak.x
+
+    Purpose
+      Return input/key ownership to the game after the menu closes or fails to
+      present.
+
+    Behavior
+      - Hides gOverlayWindow and shows gButtonWindow.
+      - Prefers gPreviousKeyWindow if it is still visible.
+      - Otherwise finds a visible non-Rxaa window and makes it key.
+      - If no game window exists, resigns the overlay's key status.
+      - Clears gPreviousKeyWindow.
 
 7. RAACHEATRootController -loadView
    Signature: - (void)loadView
@@ -323,8 +426,9 @@ PART 1 - TWEAK.X FUNCTIONS
      Replaces self.view.
 
    Notes
-     This controller is not the menu itself. It only hosts the floating button
-     and presents the Rxaa navigation controller.
+     This controller is not the menu itself. It presents the Rxaa navigation
+     controller and hosts the fallback gesture target. The floating button is
+     hosted by RAACHEATButtonController in a separate small window.
 
 8. RAACHEATRootController -raacheatOpen
    Signature: - (void)raacheatOpen
@@ -332,7 +436,7 @@ PART 1 - TWEAK.X FUNCTIONS
    Class:    RAACHEATRootController
 
    Purpose
-     Button target for the floating icon.
+     Fallback-gesture target for the full-screen overlay controller.
 
    Parameters
      None.
@@ -344,7 +448,8 @@ PART 1 - TWEAK.X FUNCTIONS
      Calls RAACHEATOpenPanel.
 
    Side effects
-     Presents the Rxaa menu when the guards in RAACHEATOpenPanel pass.
+     Presents the full-screen Rxaa menu when the guards in RAACHEATOpenPanel
+     pass. The floating-button tap uses RAACHEATButtonController instead.
 
 8a. RAACHEATRootController -viewWillTransitionToSize:withTransitionCoordinator:
     Signature: - (void)viewWillTransitionToSize:(CGSize)size
@@ -369,34 +474,76 @@ PART 1 - TWEAK.X FUNCTIONS
       - The menu remains UIModalPresentationFullScreen.
 
     Side effects
-      Updates the overlay window, root view, and floating button frames.
+      Updates the overlay window, root view, and button-window position.
 
-9. RAACHEATRootController -raacheatPan:
-   Signature: - (void)raacheatPan:(UIPanGestureRecognizer *)pan
+9. RAACHEATButtonController -loadView
+   Signature: - (void)loadView
    Location: Tweak.x
-   Class:    RAACHEATRootController
+   Class:    RAACHEATButtonController
 
    Purpose
-     Let the user drag the floating button around the screen.
-
-   Parameters
-     pan - the attached UIPanGestureRecognizer.
-
-   Returns
-     void.
+     Build the 52x52 root view for the separate button window.
 
    Behavior
-     Reads the translation in the button's superview, adds it to the button's
-     center, and resets the gesture translation to zero.
-
-   Side effects
-     Moves gFloatButton. Does not persist its position across launches.
+     Creates a clear UIView with kRXAAFloatButtonSize width/height. The view is
+     transparent and clips to its bounds only when needed.
 
    Notes
-     The button is added with an autoresizing mask that keeps it near the
-     top-right on rotation, but dragging changes its center.
+     This window is the only visible Rxaa window while the menu is closed, so
+     the rest of the screen remains touchable for the game.
 
-9a. RAACHEATRootController -gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:
+9a. RAACHEATButtonController -viewDidLayoutSubviews
+    Signature: - (void)viewDidLayoutSubviews
+    Location: Tweak.x
+    Class:    RAACHEATButtonController
+
+    Purpose
+      Keep the button filling the small button window.
+
+    Behavior
+      Sets gFloatButton.frame to self.view.bounds.
+
+9b. RAACHEATButtonController -raacheatOpen
+    Signature: - (void)raacheatOpen
+    Location: Tweak.x
+    Class:    RAACHEATButtonController
+
+    Purpose
+      Open the full-screen menu when the floating button is tapped.
+
+    Behavior
+      Calls RAACHEATOpenPanel. The pan recognizer fails for a tap, so a tap
+      opens the menu while a drag moves the button.
+
+9c. RAACHEATButtonController -raacheatPan:
+    Signature: - (void)raacheatPan:(UIPanGestureRecognizer *)pan
+    Location: Tweak.x
+    Class:    RAACHEATButtonController
+
+    Purpose
+      Let the user drag the button window anywhere on screen.
+
+    Parameters
+      pan - the attached UIPanGestureRecognizer.
+
+    Returns
+      void.
+
+    Behavior
+      - On Began: records the window center and the gesture's location in the
+        full-screen overlay's coordinate space; fades the button slightly.
+      - On Changed: computes the new center from the drag delta and clamps it
+        with RAACHEATClampFloatButtonCenter.
+      - On Ended/Cancelled/Failed: clamps again, saves the normalized position
+        with RAACHEATSaveFloatButtonPosition, and restores full opacity.
+      - Uses a tap gesture for opening, so dragging does not accidentally open
+        the menu.
+
+    Side effects
+      Moves gButtonWindow and writes NSUserDefaults rxaa.float.centerX/Y. Does
+      not touch game memory or process state.
+
+9d. RAACHEATRootController -gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:
     Signature: - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
                  shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
     Location: Tweak.x
@@ -537,10 +684,30 @@ PART 1 - TWEAK.X FUNCTIONS
 
     Behavior
       Calls -dismissViewControllerAnimated:completion: on the navigation
-      controller and sets gMenuNav = nil in the completion block.
+      controller, sets gMenuNav = nil, restores the game key window, hides the
+      full-screen overlay, and re-shows the button window in the completion.
 
     Side effects
-      Removes the menu from the screen and clears the global menu reference.
+      Removes the menu from the screen, clears the global menu reference, and
+      returns input ownership to the game.
+
+13a. RXAAMenuViewController -viewDidDisappear:
+    Signature: - (void)viewDidDisappear:(BOOL)animated
+    Location: Tweak.x
+    Class:    RXAAMenuViewController
+
+    Purpose
+      Clean up if the menu is dismissed by an ancestor or by the system rather
+      than through -closeMenu.
+
+    Behavior
+      Calls super. If self or the navigation controller is being dismissed,
+      clears gMenuNav and calls RAACHEATRestorePreviousKeyWindow. Pushing
+      All Features/Get Code does not trigger this cleanup because the
+      navigation controller is not being dismissed.
+
+    Side effects
+      Same cleanup as -closeMenu: hide overlay, show button, restore game key.
 
 14. RXAAMenuViewController -numberOfSectionsInTableView:
     Signature: - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
@@ -832,7 +999,8 @@ PART 1 - TWEAK.X FUNCTIONS
 
     Behavior
       Calls -dismissViewControllerAnimated:completion: on the navigation
-      controller and sets gMenuNav = nil in the completion block.
+      controller, sets gMenuNav = nil, restores the game key window, hides the
+      full-screen overlay, and re-shows the button window in the completion.
 
 25. RXAACatalogViewController -preferredStatusBarStyle
     Signature: - (UIStatusBarStyle)preferredStatusBarStyle
@@ -873,31 +1041,38 @@ PART 1 - TWEAK.X FUNCTIONS
 
     Window selection
       - On iOS 13+, calls RAACHEATActiveWindowScene.
-      - If a scene exists, creates a UIWindow with initWithWindowScene.
+      - If a scene exists, creates the full-screen overlay with
+        initWithWindowScene and the separate button window with
+        initWithWindowScene.
       - If no scene exists but app.windows is non-empty, uses the legacy
-        UIWindow initWithFrame fallback (older apps that do not adopt UIScene).
+        UIWindow initWithFrame fallback for the overlay and the button window
+        (older apps that do not adopt UIScene).
       - If there is no scene and no app window yet, returns and retries.
-      - On iOS 12 and older, creates a frame-based UIWindow.
+      - On iOS 12 and older, creates frame-based UIWindows.
 
     Behavior
-      - Sets windowLevel = UIWindowLevelAlert + 100 so the overlay stays above
-        normal game HUD/window layers.
-      - Makes the window transparent.
+      - Sets the full-screen overlay to UIWindowLevelAlert + 100 and initially
+        hides it (hidden = YES), so it cannot block game touches while closed.
+      - Makes the overlay transparent.
       - Installs RAACHEATRootController and sets the root view frame.
-      - Sets hidden = NO (does not call makeKeyAndVisible).
-      - Creates a 52x52 button at the top-right.
-      - Applies corner radius, border, clipping and accessibility label "Rxaa".
+      - Creates a separate 52x52 UIWindow at UIWindowLevelAlert + 101 for the
+        floating button.
+      - Creates RAACHEATButtonController as the button window's root.
+      - Creates the 52x52 button and applies corner radius, border, clipping and
+        accessibility label "Rxaa".
       - Loads menu_icon.png, then menu_image.jpg, as a background image.
       - Falls back to the letter "R" if no icon exists.
-      - Adds -raacheatOpen for touch-up-inside.
       - Adds a UIPanGestureRecognizer for -raacheatPan:.
-      - Adds the button to the root view.
-      - Calls RAACHEATInstallOpenGesture.
+      - Adds a single-tap gesture for -raacheatOpen. A drag does not open the
+        menu; a tap does.
+      - Restores the saved button-window position.
+      - Calls RAACHEATInstallOpenGesture on the game host window.
       - Logs "[Rxaa] overlay installed ..." for diagnostics.
 
     Side effects
-      Creates a UIWindow, UIButton, and gesture recognizers in the current app
-      process. No game process is modified.
+      Creates two UIWindows, a UIButton, and gesture recognizers in the current
+      app process. No game process is modified. The full-screen menu window is
+      hidden; only the 52x52 button window is visible until the menu opens.
 
 27. RAACHEATTryInstall
     Signature: static void RAACHEATTryInstall(void)
@@ -1020,8 +1195,8 @@ PART 1 - TWEAK.X FUNCTIONS
     Location: Tweak.x
 
     Purpose
-      Reattach the existing overlay window to the current active scene and
-      refresh its frame/gesture after app activation.
+      Reattach both Rxaa windows to the current active scene and refresh their
+      frame/gesture/visibility after app activation.
 
     Parameters
       None.
@@ -1032,29 +1207,35 @@ PART 1 - TWEAK.X FUNCTIONS
     Behavior
       - Returns if gOverlayWindow is nil.
       - On iOS 13+, gets RAACHEATActiveWindowScene.
-      - Sets gOverlayWindow.windowScene if it changed.
+      - Sets gOverlayWindow.windowScene and gButtonWindow.windowScene if they
+        changed.
       - Updates gOverlayWindow.frame from scene.coordinateSpace.bounds.
-      - Sets hidden = NO.
       - Updates the root view frame.
       - Reinstalls the fallback gesture.
+      - Keeps the full-screen overlay at UIWindowLevelAlert + 100 and the button
+        window at UIWindowLevelAlert + 101.
+      - If gMenuNav is non-nil: shows the overlay and hides the button window.
+      - If gMenuNav is nil: hides the overlay, shows the button window, and
+        restores/clamps the saved button position.
 
 32a. RAACHEATEnsureOverlayVisible
      Signature: static void RAACHEATEnsureOverlayVisible(void)
      Location: Tweak.x
 
      Purpose
-       Re-show and re-raise the overlay after the game changes windows, enters a
-       match, returns to the foreground, or switches scenes.
+       Keep Rxaa usable after the game changes windows, enters a match, returns
+       to the foreground, or switches scenes, without blocking game input.
 
      Behavior
        - Returns if gOverlayWindow is nil.
-       - Records whether the window was hidden.
        - Calls RAACHEATAttachWindowToScene.
-       - Sets hidden = NO.
-       - Sets windowLevel = UIWindowLevelAlert + 100.
-       - If gMenuNav is non-nil, calls makeKeyAndVisible so menu input stays
-         active.
-       - Logs "[Rxaa] overlay re-shown" only when the window had been hidden.
+       - If gMenuNav is non-nil (menu open): shows the overlay, hides the button
+         window, and calls makeKeyAndVisible so menu input stays active.
+       - If gMenuNav is nil (menu closed): hides the full-screen overlay and
+         shows only the small button window, so the game remains clickable
+         outside the button.
+       - Does not steal key status or log a re-show message while the menu is
+         closed.
 
      Side effects
        Window visibility/level changes and scene reattachment. No game process
@@ -1081,13 +1262,17 @@ PART 1 - TWEAK.X FUNCTIONS
       - UISceneDidActivateNotification (iOS 13+)
       - UIWindowDidBecomeKeyNotification
       - UIWindowDidBecomeVisibleNotification
-      Each handler resets gInstallAttempts, then either calls
-      RAACHEATEnsureOverlayVisible for an existing window or calls
-      RAACHEATTryInstall.
+      - UIDeviceOrientationDidChangeNotification
+      - UIWindowSceneDidUpdateCoordinateSpaceNotification (iOS 13+)
+      Activation/scene handlers reset gInstallAttempts, then either call
+      RAACHEATEnsureOverlayVisible for an existing window or call
+      RAACHEATTryInstall. Key/visible handlers ignore Rxaa's own two windows.
 
     Notes
-      The key/visible observers keep the overlay above a newly-created game
-      match window. They do not inspect or modify game data.
+      When the menu is closed, the observers keep only the small button window
+      visible and hide the full-screen overlay; this preserves game clicks.
+      When the menu is open, they re-key the full-screen overlay. They do not
+      inspect or modify game data.
 
 
 PART 1B - CATALOG-DRIVEN FEATURE BROWSER
@@ -1624,7 +1809,11 @@ LIMITATIONS
   project.
 - The floating button appears only in processes where the filter matches and
   UIApplication is available.
-- The overlay does not persist button position.
+- The floating button position is persisted per app and clamped to the screen
+  safe area. The full-screen overlay is hidden while the menu is closed, so game
+  input is not blocked outside the 52x52 button window.
+- While the menu is open, it intentionally captures game touches (it is a
+  full-screen modal). Tap Close to return input to the game.
 - The catalog does not make network requests.
 - This documentation is static; the tweak was not compiled on the Windows
   workstation used to generate it.

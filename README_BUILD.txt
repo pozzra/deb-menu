@@ -12,9 +12,13 @@ actions. All Features prefers menu_catalog.json, falls back to an embedded
 grouped by category; actionable entries have UI-only switches. Get Code opens
 the offline WebKit browser containing the menu-name/code catalog. The menu is
 presented full screen and refreshes its overlay bounds when the scene rotates
-or resizes. When the game changes windows or returns from a match, the overlay
-is re-shown and raised above normal game windows. The button icon is generated
-from menu_image.jpg.
+or resizes. When the game changes windows or returns from a match, the button
+is re-shown and the full-screen overlay is re-attached; the overlay is raised
+only while the menu is open. The floating button can be
+dragged anywhere on screen; its position is saved and clamped inside the safe
+area. The button lives in its own 52x52 window, and the full-screen menu window
+is hidden while the menu is closed, so game touches are not blocked outside the
+button. The button icon is generated from menu_image.jpg.
 
 The switches are UI-only. They save ON/OFF in NSUserDefaults and update the
 label; they do not hook, read, or write any game process.
@@ -87,6 +91,11 @@ INSTALL NOTES
   It retries for about 60 seconds and also retries when the app becomes active.
 - Fallback opening gesture: triple-tap with four fingers anywhere in the app.
   This opens Rxaa even if the floating button is covered or off-screen.
+- Drag the floating button to move it. Tap it without dragging to open the menu.
+  The position is remembered per app and is clamped to the screen safe area.
+- While the menu is open, it is full screen and intentionally captures game
+  touches. Tap Close to dismiss it; the full-screen window is hidden again and
+  the game receives touches outside the floating button.
 - The AimLock switch is a visual demo. It is ON/OFF only for the menu; there is
   no aimbot, memory write, or game hook behind it.
 - All Features lists the 116 feature entries from menu_catalog.json, or the
@@ -108,16 +117,21 @@ INSTALL NOTES
     * check the catalog files exist at one of the two paths above
     * check the tweak is enabled in your jailbreak's tweak injector
     * check Console/log output for messages beginning with [Rxaa]
-- If the menu disappears after joining a match, install the 1.2.4 build
-  (the overlay now re-shows itself when the game swaps key/visible windows).
-  If it still disappears, the game may be using a separate process or scene;
-  send the target bundle ID and [Rxaa] logs for diagnosis.
+- If the menu disappears after joining a match, install the 1.2.5 build
+  (the button re-shows itself when the game swaps key/visible windows). If it
+  still disappears, the game may be using a separate process or scene; send the
+  target bundle ID and [Rxaa] logs for diagnosis.
+- If game controls stop responding, tap the menu's Close button. The full-screen
+  menu intentionally captures touches while open; 1.2.5 hides that window after
+  Close and leaves only the 52x52 button window, so the game is clickable again.
+  If controls are still blocked, send a screenshot and [Rxaa] logs.
 - If the app does not link UIKit, add that app's bundle identifier to the
   Bundles array in RAACHEATMenuDebug.plist. Do not use com.apple.Security unless
   you really need every process, because it injects much more broadly.
-- The floating button's window is pass-through outside the button, so it does
-  not block the underlying app. The Rxaa list itself opens as a full-screen
-  modal with its own Close button.
+- The floating button uses a small button-only window. The full-screen overlay
+  window is hidden while the menu is closed, so the game is clickable everywhere
+  except the 52x52 button. The Rxaa list itself opens as a full-screen modal
+  with its own Close button.
 
 SAFETY
 ------

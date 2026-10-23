@@ -1,6 +1,6 @@
 {
   "app": "Rxaa Menu Code - Debug Catalog",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "generated": "2026-10-23",
   "telegram": "@kun_amra",
   "theme": "Pure Black (#000000)",
@@ -28,5 +28,9 @@
   "bundled_python_engine": "mod_menu.py",
   "terminal_command": "rxa-menu",
   "overlay_watchdog": true,
-  "window_level": "UIWindowLevelAlert + 100"
+  "window_level": "UIWindowLevelAlert + 100",
+  "button_window_level": "UIWindowLevelAlert + 101",
+  "draggable_button": true,
+  "button_position_saved": true,
+  "fullscreen_overlay_hidden_when_closed": true
 }
