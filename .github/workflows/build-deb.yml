@@ -28,8 +28,9 @@ jobs:
 
       - name: Build rootful package
         run: |
+          set -o pipefail
           chmod +x layout/usr/bin/rxa-menu
-          make clean package FINALPACKAGE=1
+          make clean package FINALPACKAGE=1 2>&1 | tee build.log
           mkdir -p out/rootful
           mv packages/*.deb out/rootful/
           src="$(find out/rootful -maxdepth 1 -name '*.deb' | head -n 1)"
@@ -39,8 +40,9 @@ jobs:
       - name: Build rootless package
         continue-on-error: true
         run: |
+          set -o pipefail
           chmod +x layout/usr/bin/rxa-menu
-          make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless 2>&1 | tee -a build.log
           mkdir -p out/rootless
           mv packages/*.deb out/rootless/
           src="$(find out/rootless -maxdepth 1 -name '*.deb' | head -n 1)"
@@ -62,3 +64,20 @@ jobs:
           name: Rxaa-rootless-deb
           path: out/rootless/Rxaa-rootless.deb
           if-no-files-found: warn
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: warn
+
+      - name: Report build errors
+        if: failure()
+        run: |
+          if [ -f build.log ]; then
+            grep -n -E "error:|fatal error:|undefined reference|No such file|Error [0-9]" build.log | head -n 20 | while IFS= read -r line; do
+              echo "::error title=Build error::$line"
+            done
+          fi
