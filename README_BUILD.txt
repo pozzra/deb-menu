@@ -12,9 +12,9 @@ actions. All Features prefers menu_catalog.json, falls back to an embedded
 grouped by category; actionable entries have UI-only switches. Get Code opens
 the offline WebKit browser containing the menu-name/code catalog. The menu is
 presented full screen and refreshes its overlay bounds when the scene rotates
-or resizes. When the game changes windows or returns from a match, the button
-is re-shown and the full-screen overlay is re-attached; the overlay is raised
-only while the menu is open. The floating button can be
+or resizes. When the game changes windows or returns from a match, the small
+button window is re-shown; the full-screen overlay is raised only while the
+menu is open and stays hidden otherwise. The floating button can be
 dragged anywhere on screen; its position is saved and clamped inside the safe
 area. The button lives in its own 52x52 window, and the full-screen menu window
 is hidden while the menu is closed, so game touches are not blocked outside the
@@ -105,8 +105,9 @@ INSTALL NOTES
   the scene resizes, the overlay window, root view, and floating button bounds
   are refreshed.
 - The overlay listens for app activation, scene activation, and key/visible
-  window changes. If the game creates a new match window, the overlay is
-  re-shown at UIWindowLevelAlert + 100 so the floating button remains reachable.
+  window changes. If the game creates a new match window, the 52x52 button
+  window is kept at UIWindowLevelAlert + 101 while the full-screen overlay
+  remains hidden unless the menu is open.
 - Install the artifact that matches the jailbreak:
     * rootful jailbreak -> Rxaa.deb
     * rootless jailbreak (Dopamine/palera1n) -> Rxaa-rootless.deb
