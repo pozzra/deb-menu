@@ -464,8 +464,10 @@ static void RAACHEATRestorePreviousKeyWindow(void) {
     }
     if (target) {
         [target makeKeyWindow];
+        NSLog(@"[Rxaa] game key window restored: %@", target);
     } else if (gOverlayWindow) {
         [gOverlayWindow resignKeyWindow];
+        NSLog(@"[Rxaa] no game key window found; overlay resigned key");
     }
     gPreviousKeyWindow = nil;
 }
@@ -536,7 +538,7 @@ static void RAACHEATOpenPanel(void) {
     }
     if (!gPreviousKeyWindow) {
         for (UIWindow *window in [UIApplication sharedApplication].windows) {
-            if (window != gOverlayWindow && window != gButtonWindow) {
+            if (window != gOverlayWindow && window != gButtonWindow && !window.hidden) {
                 gPreviousKeyWindow = window;
                 break;
             }
@@ -1334,6 +1336,11 @@ static void RAACHEATObserveLifecycle(void) {
             (void)note;
             if (gOverlayWindow) {
                 RAACHEATEnsureOverlayVisible();
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    if (gOverlayWindow) {
+                        RAACHEATEnsureOverlayVisible();
+                    }
+                });
             }
         }];
         (void)orientationToken;
