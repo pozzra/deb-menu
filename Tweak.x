@@ -17,8 +17,8 @@ static CGFloat const kRXAAFloatButtonSize = 52.0;
 static CGFloat const kRXAAFloatButtonMargin = 10.0;
 static NSString * const kRXAAFloatCenterXKey = @"rxaa.float.centerX";
 static NSString * const kRXAAFloatCenterYKey = @"rxaa.float.centerY";
-static CGPoint gButtonPanStartCenter = CGPointZero;
-static CGPoint gButtonPanStartPoint = CGPointZero;
+static CGPoint gButtonPanStartCenter;
+static CGPoint gButtonPanStartPoint;
 
 static void RAACHEATAttachWindowToScene(void);
 
